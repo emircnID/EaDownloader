@@ -168,7 +168,7 @@ func SelectMedia(media *models.Media, formatID string) (*models.Media, error) {
 }
 
 func bestVideoFormat(info *Info, target int32) *Format {
-	var candidates []*Format
+	candidates := make([]*Format, 0, len(info.Formats))
 	for i := range info.Formats {
 		format := &info.Formats[i]
 		if !isDownloadable(format) || !hasVideo(format) {
@@ -209,7 +209,7 @@ func bestVideoFormat(info *Info, target int32) *Format {
 }
 
 func bestAudioFormat(info *Info) *Format {
-	var candidates []*Format
+	candidates := make([]*Format, 0, len(info.Formats))
 	for i := range info.Formats {
 		format := &info.Formats[i]
 		if !isDownloadable(format) || hasVideo(format) || !hasAudio(format) {
@@ -245,7 +245,7 @@ func bestAudioFormat(info *Info) *Format {
 }
 
 func bestMergeAudioFormat(info *Info) *Format {
-	var candidates []*Format
+	candidates := make([]*Format, 0, len(info.Formats))
 	for i := range info.Formats {
 		format := &info.Formats[i]
 		if !isDownloadable(format) || hasVideo(format) || !hasAudio(format) {
