@@ -22,3 +22,4 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: false
+          load: true
