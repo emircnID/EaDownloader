@@ -77,6 +77,9 @@ func StatsCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 func resolveStatsCallback(data string) (string, string, string, error) {
 	parts := strings.Split(data, ":")
 	if len(parts) == 2 {
+		if isStatsScreen(parts[1]) {
+			return resolveStatsScreen(parts[1], statsPeriodAll)
+		}
 		text, err := formatStatsSummary(parts[1])
 		return text, statsScreenSummary, parts[1], err
 	}
@@ -85,12 +88,15 @@ func resolveStatsCallback(data string) (string, string, string, error) {
 		return text, statsScreenSummary, statsPeriodAll, err
 	}
 
-	screen := parts[1]
 	period := statsPeriodAll
 	if len(parts) >= 3 {
 		period = parts[2]
 	}
 
+	return resolveStatsScreen(parts[1], period)
+}
+
+func resolveStatsScreen(screen string, period string) (string, string, string, error) {
 	var (
 		text string
 		err  error
@@ -115,6 +121,15 @@ func resolveStatsCallback(data string) (string, string, string, error) {
 		period = statsPeriodAll
 	}
 	return text, screen, period, err
+}
+
+func isStatsScreen(value string) bool {
+	switch value {
+	case statsScreenSummary, statsScreenUsers, statsScreenGroups, statsScreenPlatforms, statsScreenErrors:
+		return true
+	default:
+		return false
+	}
 }
 
 func formatStatsSummary(period string) (string, error) {
