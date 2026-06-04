@@ -84,3 +84,153 @@ func (q *Queries) GetStats(ctx context.Context, sinceDate pgtype.Timestamptz) (G
 	)
 	return i, err
 }
+
+const getPlatformStats = `-- name: GetPlatformStats :many
+SELECT
+    m.extractor_id,
+    COUNT(*)::BIGINT AS downloads,
+    COALESCE(SUM(mf.file_size), 0)::BIGINT AS total_size
+FROM media m
+JOIN media_item mi ON mi.media_id = m.id
+JOIN media_format mf ON mf.item_id = mi.id
+WHERE m.created_at >= $1::TIMESTAMP WITH TIME ZONE
+GROUP BY m.extractor_id
+ORDER BY downloads DESC, total_size DESC
+`
+
+type GetPlatformStatsRow struct {
+	ExtractorID string
+	Downloads   int64
+	TotalSize   int64
+}
+
+func (q *Queries) GetPlatformStats(ctx context.Context, sinceDate pgtype.Timestamptz) ([]GetPlatformStatsRow, error) {
+	rows, err := q.db.Query(ctx, getPlatformStats, sinceDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPlatformStatsRow
+	for rows.Next() {
+		var i GetPlatformStatsRow
+		if err := rows.Scan(&i.ExtractorID, &i.Downloads, &i.TotalSize); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecentErrors = `-- name: GetRecentErrors :many
+SELECT
+    id,
+    message,
+    occurrences,
+    first_seen,
+    last_seen
+FROM errors
+ORDER BY last_seen DESC
+LIMIT $1
+`
+
+type GetRecentErrorsRow struct {
+	ID          string
+	Message     string
+	Occurrences int32
+	FirstSeen   pgtype.Timestamp
+	LastSeen    pgtype.Timestamp
+}
+
+func (q *Queries) GetRecentErrors(ctx context.Context, limitCount int32) ([]GetRecentErrorsRow, error) {
+	rows, err := q.db.Query(ctx, getRecentErrors, limitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetRecentErrorsRow
+	for rows.Next() {
+		var i GetRecentErrorsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Message,
+			&i.Occurrences,
+			&i.FirstSeen,
+			&i.LastSeen,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listChatsByType = `-- name: ListChatsByType :many
+SELECT
+    c.chat_id,
+    c.type,
+    c.title,
+    c.username,
+    c.first_name,
+    c.last_name,
+    s.language,
+    c.created_at,
+    c.last_seen_at
+FROM chat c
+JOIN settings s USING (chat_id)
+WHERE c.type = $1
+ORDER BY c.last_seen_at DESC
+LIMIT $2
+`
+
+type ListChatsByTypeParams struct {
+	Type       ChatType
+	LimitCount int32
+}
+
+type ListChatsByTypeRow struct {
+	ChatID     int64
+	Type       ChatType
+	Title      string
+	Username   string
+	FirstName  string
+	LastName   string
+	Language   string
+	CreatedAt  pgtype.Timestamptz
+	LastSeenAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListChatsByType(ctx context.Context, arg ListChatsByTypeParams) ([]ListChatsByTypeRow, error) {
+	rows, err := q.db.Query(ctx, listChatsByType, arg.Type, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChatsByTypeRow
+	for rows.Next() {
+		var i ListChatsByTypeRow
+		if err := rows.Scan(
+			&i.ChatID,
+			&i.Type,
+			&i.Title,
+			&i.Username,
+			&i.FirstName,
+			&i.LastName,
+			&i.Language,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

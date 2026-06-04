@@ -7,18 +7,27 @@ package database
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getOrCreateChat = `-- name: GetOrCreateChat :one
 WITH upsert_chat AS (
-    INSERT INTO chat (chat_id, type)
-    VALUES ($1, $2)
-    ON CONFLICT (chat_id) DO NOTHING
-    RETURNING chat_id, type, created_at, updated_at
+    INSERT INTO chat (chat_id, type, title, username, first_name, last_name, last_seen_at)
+    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    ON CONFLICT (chat_id) DO UPDATE SET
+        type = EXCLUDED.type,
+        title = EXCLUDED.title,
+        username = EXCLUDED.username,
+        first_name = EXCLUDED.first_name,
+        last_name = EXCLUDED.last_name,
+        last_seen_at = NOW(),
+        updated_at = NOW()
+    RETURNING chat_id, type, created_at, updated_at, title, username, first_name, last_name, last_seen_at
 ),
 upsert_settings AS (
     INSERT INTO settings (chat_id, language, captions, silent, nsfw, media_album_limit, delete_links)
-    VALUES ($1, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $7, $8, $9, $10, $11, $12)
     ON CONFLICT (chat_id) DO UPDATE SET
         language = CASE 
             WHEN settings.language = 'XX' THEN EXCLUDED.language 
@@ -27,9 +36,9 @@ upsert_settings AS (
     RETURNING chat_id, nsfw, media_album_limit, captions, silent, language, created_at, updated_at, disabled_extractors, delete_links
 ),
 final_chat AS (
-    SELECT chat_id, type, created_at, updated_at FROM upsert_chat
+    SELECT chat_id, type, created_at, updated_at, title, username, first_name, last_name, last_seen_at FROM upsert_chat
     UNION ALL
-    SELECT chat_id, type, created_at, updated_at FROM chat WHERE chat_id = $1 AND NOT EXISTS (SELECT 1 FROM upsert_chat)
+    SELECT chat_id, type, created_at, updated_at, title, username, first_name, last_name, last_seen_at FROM chat WHERE chat_id = $1 AND NOT EXISTS (SELECT 1 FROM upsert_chat)
 ),
 final_settings AS (
     SELECT chat_id, nsfw, media_album_limit, captions, silent, language, created_at, updated_at, disabled_extractors, delete_links FROM upsert_settings
@@ -37,6 +46,11 @@ final_settings AS (
 SELECT 
     c.chat_id,
     c.type,
+    c.title,
+    c.username,
+    c.first_name,
+    c.last_name,
+    c.last_seen_at,
     s.nsfw,
     s.media_album_limit,
     s.captions,
@@ -51,6 +65,10 @@ JOIN final_settings s ON s.chat_id = c.chat_id
 type GetOrCreateChatParams struct {
 	ChatID          int64
 	Type            ChatType
+	Title           string
+	Username        string
+	FirstName       string
+	LastName        string
 	Language        string
 	Captions        bool
 	Silent          bool
@@ -62,6 +80,11 @@ type GetOrCreateChatParams struct {
 type GetOrCreateChatRow struct {
 	ChatID             int64
 	Type               ChatType
+	Title              string
+	Username           string
+	FirstName          string
+	LastName           string
+	LastSeenAt         pgtype.Timestamptz
 	Nsfw               bool
 	MediaAlbumLimit    int32
 	Captions           bool
@@ -75,6 +98,10 @@ func (q *Queries) GetOrCreateChat(ctx context.Context, arg GetOrCreateChatParams
 	row := q.db.QueryRow(ctx, getOrCreateChat,
 		arg.ChatID,
 		arg.Type,
+		arg.Title,
+		arg.Username,
+		arg.FirstName,
+		arg.LastName,
 		arg.Language,
 		arg.Captions,
 		arg.Silent,
@@ -86,6 +113,11 @@ func (q *Queries) GetOrCreateChat(ctx context.Context, arg GetOrCreateChatParams
 	err := row.Scan(
 		&i.ChatID,
 		&i.Type,
+		&i.Title,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.LastSeenAt,
 		&i.Nsfw,
 		&i.MediaAlbumLimit,
 		&i.Captions,

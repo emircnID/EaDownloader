@@ -47,3 +47,43 @@ SELECT
     
     COALESCE((SELECT total_downloads FROM downloads_stats), 0)::BIGINT as total_downloads,
     COALESCE((SELECT total_size FROM downloads_stats), 0)::BIGINT as total_downloads_size;
+
+-- name: ListChatsByType :many
+SELECT
+    c.chat_id,
+    c.type,
+    c.title,
+    c.username,
+    c.first_name,
+    c.last_name,
+    s.language,
+    c.created_at,
+    c.last_seen_at
+FROM chat c
+JOIN settings s USING (chat_id)
+WHERE c.type = @type
+ORDER BY c.last_seen_at DESC
+LIMIT @limit_count;
+
+-- name: GetPlatformStats :many
+SELECT
+    m.extractor_id,
+    COUNT(*)::BIGINT AS downloads,
+    COALESCE(SUM(mf.file_size), 0)::BIGINT AS total_size
+FROM media m
+JOIN media_item mi ON mi.media_id = m.id
+JOIN media_format mf ON mf.item_id = mi.id
+WHERE m.created_at >= @since_date::TIMESTAMP WITH TIME ZONE
+GROUP BY m.extractor_id
+ORDER BY downloads DESC, total_size DESC;
+
+-- name: GetRecentErrors :many
+SELECT
+    id,
+    message,
+    occurrences,
+    first_seen,
+    last_seen
+FROM errors
+ORDER BY last_seen DESC
+LIMIT @limit_count;

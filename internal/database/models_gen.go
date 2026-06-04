@@ -148,10 +148,15 @@ func (ns NullMediaType) Value() (driver.Value, error) {
 }
 
 type Chat struct {
-	ChatID    int64
-	Type      ChatType
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ChatID     int64
+	Type       ChatType
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+	Title      string
+	Username   string
+	FirstName  string
+	LastName   string
+	LastSeenAt pgtype.Timestamptz
 }
 
 type Errors struct {

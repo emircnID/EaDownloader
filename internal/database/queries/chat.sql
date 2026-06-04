@@ -1,8 +1,15 @@
 -- name: GetOrCreateChat :one
 WITH upsert_chat AS (
-    INSERT INTO chat (chat_id, type)
-    VALUES (@chat_id, @type)
-    ON CONFLICT (chat_id) DO NOTHING
+    INSERT INTO chat (chat_id, type, title, username, first_name, last_name, last_seen_at)
+    VALUES (@chat_id, @type, @title, @username, @first_name, @last_name, NOW())
+    ON CONFLICT (chat_id) DO UPDATE SET
+        type = EXCLUDED.type,
+        title = EXCLUDED.title,
+        username = EXCLUDED.username,
+        first_name = EXCLUDED.first_name,
+        last_name = EXCLUDED.last_name,
+        last_seen_at = NOW(),
+        updated_at = NOW()
     RETURNING *
 ),
 upsert_settings AS (
@@ -26,6 +33,11 @@ final_settings AS (
 SELECT 
     c.chat_id,
     c.type,
+    c.title,
+    c.username,
+    c.first_name,
+    c.last_name,
+    c.last_seen_at,
     s.nsfw,
     s.media_album_limit,
     s.captions,

@@ -19,6 +19,10 @@ func ChatFromContext(ctx *ext.Context) (*database.GetOrCreateChatRow, error) {
 	var id int64
 	var chatType database.ChatType
 	var languageCode string
+	var title string
+	var username string
+	var firstName string
+	var lastName string
 
 	switch {
 	case ctx.Message != nil:
@@ -29,24 +33,42 @@ func ChatFromContext(ctx *ext.Context) (*database.GetOrCreateChatRow, error) {
 		}
 		if chat.Type == gotgbot.ChatTypePrivate {
 			chatType = database.ChatTypePrivate
+			if ctx.EffectiveUser != nil {
+				username = ctx.EffectiveUser.Username
+				firstName = ctx.EffectiveUser.FirstName
+				lastName = ctx.EffectiveUser.LastName
+			}
 		} else {
 			chatType = database.ChatTypeGroup
+			title = chat.Title
+			username = chat.Username
 		}
 	case ctx.InlineQuery != nil:
 		id = ctx.InlineQuery.From.Id
 		languageCode = ctx.InlineQuery.From.LanguageCode
 		chatType = database.ChatTypePrivate
+		username = ctx.InlineQuery.From.Username
+		firstName = ctx.InlineQuery.From.FirstName
+		lastName = ctx.InlineQuery.From.LastName
 	case ctx.CallbackQuery != nil:
 		if ctx.CallbackQuery.Message == nil {
 			chatType = database.ChatTypePrivate
 			id = ctx.CallbackQuery.From.Id
 			languageCode = ctx.CallbackQuery.From.LanguageCode
+			username = ctx.CallbackQuery.From.Username
+			firstName = ctx.CallbackQuery.From.FirstName
+			lastName = ctx.CallbackQuery.From.LastName
 		} else {
 			chat := ctx.CallbackQuery.Message.GetChat()
 			if chat.Type == gotgbot.ChatTypePrivate {
 				chatType = database.ChatTypePrivate
+				username = ctx.CallbackQuery.From.Username
+				firstName = ctx.CallbackQuery.From.FirstName
+				lastName = ctx.CallbackQuery.From.LastName
 			} else {
 				chatType = database.ChatTypeGroup
+				title = chat.Title
+				username = chat.Username
 			}
 			languageCode = ctx.CallbackQuery.From.LanguageCode
 			id = chat.Id
@@ -57,6 +79,8 @@ func ChatFromContext(ctx *ext.Context) (*database.GetOrCreateChatRow, error) {
 			chatType = database.ChatTypePrivate
 		} else {
 			chatType = database.ChatTypeGroup
+			title = chat.Title
+			username = chat.Username
 		}
 		if ctx.EffectiveUser != nil {
 			languageCode = ctx.EffectiveUser.LanguageCode
@@ -80,6 +104,10 @@ func ChatFromContext(ctx *ext.Context) (*database.GetOrCreateChatRow, error) {
 		database.GetOrCreateChatParams{
 			ChatID:          id,
 			Type:            chatType,
+			Title:           title,
+			Username:        username,
+			FirstName:       firstName,
+			LastName:        lastName,
 			Language:        language,
 			Captions:        config.Env.DefaultCaptions,
 			Silent:          config.Env.DefaultSilent,
@@ -305,5 +333,9 @@ func IsBotAdmin(ctx *ext.Context) bool {
 		return false
 	}
 	userID := ctx.EffectiveMessage.From.Id
+	return IsAdminID(userID)
+}
+
+func IsAdminID(userID int64) bool {
 	return slices.Contains(config.Env.Admins, userID)
 }
