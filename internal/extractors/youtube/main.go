@@ -146,13 +146,6 @@ func mediaFormatFromYouTubeFormat(
 	}
 }
 
-func bestAudioFormat(formats []*models.MediaFormat) *models.MediaFormat {
-	if len(formats) == 0 {
-		return nil
-	}
-	return sortAudioFormats(formats, database.MediaCodecAac)[0]
-}
-
 func bestAudioFormatForVideo(
 	videoCodec database.MediaCodec,
 	formats []*models.MediaFormat,
