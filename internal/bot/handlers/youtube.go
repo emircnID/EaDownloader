@@ -16,7 +16,6 @@ import (
 
 type youtubeTask struct {
 	ExtractorCtx *models.ExtractorContext
-	Media        *models.Media
 }
 
 var youtubeTasks = expirable.NewLRU[string, *youtubeTask](0, nil, 10*time.Minute)
@@ -30,7 +29,7 @@ func YouTubePromptHandler(bot *gotgbot.Bot, ctx *ext.Context, extractorCtx *mode
 		return fmt.Errorf("failed to add youtube task")
 	}
 
-	_, err = ctx.EffectiveMessage.Reply(
+	_, err := ctx.EffectiveMessage.Reply(
 		bot,
 		"YouTube formatini sec:",
 		&gotgbot.SendMessageOpts{
