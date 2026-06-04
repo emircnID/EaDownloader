@@ -21,18 +21,22 @@ jobs:
         if: github.event_name == 'push'
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' }}
-          tags: |
-            ghcr.io/emircnid/eadownloader:latest
-            ghcr.io/emircnid/eadownloader:${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/emircnID/EaDownloader
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
