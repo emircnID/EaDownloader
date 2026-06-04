@@ -3,13 +3,15 @@ package handlers
 import (
 	"slices"
 
+	"eadownloader/internal/core"
+	"eadownloader/internal/extractors"
+	"eadownloader/internal/extractors/youtube"
+	"eadownloader/internal/logger"
+	"eadownloader/internal/util"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
-	"eadownloader/internal/core"
-	"eadownloader/internal/extractors"
-	"eadownloader/internal/logger"
-	"eadownloader/internal/util"
 )
 
 func URLFilter(msg *gotgbot.Message) bool {
@@ -48,6 +50,17 @@ func URLHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	extractorCtx.SetChat(chat)
 
 	if extractorCtx.Extractor.ID == "youtube" {
+		if youtube.IsShortsURL(url) {
+			defer extractorCtx.CancelFunc()
+			defer extractorCtx.FilesTracker.Cleanup()
+
+			err = YouTubeShortsHandler(bot, ctx, extractorCtx)
+			if err != nil {
+				core.HandleError(bot, ctx, extractorCtx, err)
+			}
+			return ext.EndGroups
+		}
+
 		err = YouTubePromptHandler(bot, ctx, extractorCtx)
 		if err != nil {
 			core.HandleError(bot, ctx, extractorCtx, err)

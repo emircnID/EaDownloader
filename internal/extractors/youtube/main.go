@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	formatBest = "best"
 	format360 = "360"
 	format720 = "720"
 	format1080 = "1080"
@@ -116,6 +117,13 @@ func BuildMedia(ctx *models.ExtractorContext, info *Info) (*models.Media, error)
 		item.AddFormats(mp3AudioMediaFormat(info, audioFormat))
 	}
 
+	if IsShortsURL(ctx.ContentURL) {
+		format := bestAvailableVideoFormat(info)
+		if format != nil && (hasAudio(format) || mergeAudioFormat != nil) {
+			item.AddFormats(videoMediaFormatWithID(info, format, formatBest))
+		}
+	}
+
 	if len(item.Formats) == 0 {
 		return nil, fmt.Errorf("no downloadable youtube formats found")
 	}
@@ -137,6 +145,10 @@ func AvailableFormatIDs(media *models.Media) []string {
 	return available
 }
 
+func IsShortsURL(contentURL string) bool {
+	return strings.Contains(strings.ToLower(contentURL), "youtube.com/shorts/")
+}
+
 func SelectableFormatIDs() []string {
 	return []string{format360, format720, format1080, formatMP3}
 }
@@ -148,11 +160,39 @@ func SelectMedia(media *models.Media, formatID string) (*models.Media, error) {
 	item := media.Items[0]
 	selected := item.GetFormatByID(formatID)
 	if selected == nil {
-		return nil, fmt.Errorf("selected youtube format not found: %s", formatID)
+		if !isVideoFormatID(formatID) {
+			return nil, fmt.Errorf("selected youtube format not found: %s", formatID)
+		}
+
+		selected = fallbackVideoFormat(item, formatID)
+		if selected == nil {
+			return nil, fmt.Errorf("selected youtube format not found: %s", formatID)
+		}
 	}
 
+	return selectMediaFormat(media, selected)
+}
+
+func SelectBestVideoMedia(media *models.Media) (*models.Media, error) {
+	if media == nil || len(media.Items) == 0 {
+		return nil, fmt.Errorf("youtube media not found")
+	}
+
+	selected := media.Items[0].GetFormatByID(formatBest)
+	if selected == nil {
+		selected = media.Items[0].GetDefaultVideoFormat()
+	}
+	if selected == nil {
+		return nil, fmt.Errorf("no downloadable youtube video format found")
+	}
+
+	return selectMediaFormat(media, selected)
+}
+
+func selectMediaFormat(media *models.Media, selected *models.MediaFormat) (*models.Media, error) {
+	item := media.Items[0]
 	selectedMedia := &models.Media{
-		ContentID:   media.ContentID + "/" + formatID,
+		ContentID:   media.ContentID + "/" + selected.FormatID,
 		ContentURL:  media.ContentURL,
 		ExtractorID: media.ExtractorID,
 		Caption:     media.Caption,
@@ -170,6 +210,59 @@ func SelectMedia(media *models.Media, formatID string) (*models.Media, error) {
 	return selectedMedia, nil
 }
 
+func fallbackVideoFormat(item *models.MediaItem, formatID string) *models.MediaFormat {
+	target := formatTarget(formatID)
+	if target == 0 {
+		return item.GetDefaultVideoFormat()
+	}
+
+	candidates := item.FilterFormats(func(format *models.MediaFormat) bool {
+		return format.Type == database.MediaTypeVideo &&
+			format.VideoCodec != "" &&
+			formatTarget(format.FormatID) > 0 &&
+			formatTarget(format.FormatID) <= target
+	})
+	if len(candidates) == 0 {
+		return item.GetDefaultVideoFormat()
+	}
+
+	slices.SortFunc(candidates, func(a, b *models.MediaFormat) int {
+		aTarget := formatTarget(a.FormatID)
+		bTarget := formatTarget(b.FormatID)
+		if aTarget != bTarget {
+			if aTarget > bTarget {
+				return -1
+			}
+			return 1
+		}
+		if a.Bitrate > b.Bitrate {
+			return -1
+		}
+		if a.Bitrate < b.Bitrate {
+			return 1
+		}
+		return 0
+	})
+	return candidates[0]
+}
+
+func isVideoFormatID(formatID string) bool {
+	return formatID == format360 || formatID == format720 || formatID == format1080
+}
+
+func formatTarget(formatID string) int32 {
+	switch formatID {
+	case format360:
+		return 360
+	case format720:
+		return 720
+	case format1080:
+		return 1080
+	default:
+		return 0
+	}
+}
+
 func bestVideoFormat(info *Info, target int32) *Format {
 	candidates := make([]*Format, 0, len(info.Formats))
 	for i := range info.Formats {
@@ -178,6 +271,44 @@ func bestVideoFormat(info *Info, target int32) *Format {
 			continue
 		}
 		if qualityHeight(format) != target {
+			continue
+		}
+		if util.ParseVideoCodec(format.VideoCodec) != database.MediaCodecAvc {
+			continue
+		}
+		if format.Ext != "mp4" {
+			continue
+		}
+		candidates = append(candidates, format)
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	slices.SortFunc(candidates, func(a, b *Format) int {
+		aQuality := qualityHeight(a)
+		bQuality := qualityHeight(b)
+		if aQuality != bQuality {
+			if aQuality > bQuality {
+				return -1
+			}
+			return 1
+		}
+		if a.TBR > b.TBR {
+			return -1
+		}
+		if a.TBR < b.TBR {
+			return 1
+		}
+		return 0
+	})
+	return candidates[0]
+}
+
+func bestAvailableVideoFormat(info *Info) *Format {
+	candidates := make([]*Format, 0, len(info.Formats))
+	for i := range info.Formats {
+		format := &info.Formats[i]
+		if !isDownloadable(format) || !hasVideo(format) {
 			continue
 		}
 		if util.ParseVideoCodec(format.VideoCodec) != database.MediaCodecAvc {
@@ -275,8 +406,12 @@ func bestMergeAudioFormat(info *Info) *Format {
 }
 
 func videoMediaFormat(info *Info, format *Format, target int32) *models.MediaFormat {
+	return videoMediaFormatWithID(info, format, fmt.Sprintf("%d", target))
+}
+
+func videoMediaFormatWithID(info *Info, format *Format, formatID string) *models.MediaFormat {
 	return &models.MediaFormat{
-		FormatID:     fmt.Sprintf("%d", target),
+		FormatID:     formatID,
 		Type:         database.MediaTypeVideo,
 		VideoCodec:   util.ParseVideoCodec(format.VideoCodec),
 		AudioCodec:   audioCodec(format),

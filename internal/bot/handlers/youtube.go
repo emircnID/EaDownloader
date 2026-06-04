@@ -5,13 +5,15 @@ import (
 	"strings"
 	"time"
 
+	"eadownloader/internal/core"
+	"eadownloader/internal/extractors/youtube"
+	"eadownloader/internal/models"
+	"eadownloader/internal/util"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/google/uuid"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"eadownloader/internal/core"
-	"eadownloader/internal/extractors/youtube"
-	"eadownloader/internal/models"
 )
 
 type youtubeTask struct {
@@ -45,6 +47,35 @@ func YouTubePromptHandler(bot *gotgbot.Bot, ctx *ext.Context, extractorCtx *mode
 	}
 
 	return nil
+}
+
+func YouTubeShortsHandler(bot *gotgbot.Bot, ctx *ext.Context, extractorCtx *models.ExtractorContext) error {
+	if err := util.SendTypingAction(bot, extractorCtx.Chat.ChatID); err != nil {
+		return err
+	}
+
+	media, err := youtube.GetMedia(extractorCtx)
+	if err != nil {
+		return err
+	}
+
+	selectedMedia, err := youtube.SelectBestVideoMedia(media)
+	if err != nil {
+		return err
+	}
+
+	message := ctx.EffectiveMessage
+	isSpoiler := util.HasHashtagEntity(message, "spoiler") ||
+		util.HasHashtagEntity(message, "nsfw")
+
+	return core.HandlePreparedDownloadTask(
+		bot,
+		ctx,
+		extractorCtx,
+		selectedMedia,
+		isSpoiler,
+		true,
+	)
 }
 
 func YouTubeCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
