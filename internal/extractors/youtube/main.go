@@ -137,6 +137,10 @@ func AvailableFormatIDs(media *models.Media) []string {
 	return available
 }
 
+func SelectableFormatIDs() []string {
+	return []string{format360, format720, format1080, formatMP3}
+}
+
 func SelectMedia(media *models.Media, formatID string) (*models.Media, error) {
 	if media == nil || len(media.Items) == 0 {
 		return nil, fmt.Errorf("youtube media not found")

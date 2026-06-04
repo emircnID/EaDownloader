@@ -22,22 +22,9 @@ type youtubeTask struct {
 var youtubeTasks = expirable.NewLRU[string, *youtubeTask](0, nil, 10*time.Minute)
 
 func YouTubePromptHandler(bot *gotgbot.Bot, ctx *ext.Context, extractorCtx *models.ExtractorContext) error {
-	media, err := youtube.GetMedia(extractorCtx)
-	if err != nil {
-		extractorCtx.CancelFunc()
-		return err
-	}
-
-	formatIDs := youtube.AvailableFormatIDs(media)
-	if len(formatIDs) == 0 {
-		extractorCtx.CancelFunc()
-		return fmt.Errorf("no youtube formats available")
-	}
-
 	taskID := uuid.NewString()[:8]
 	if ok := youtubeTasks.Add(taskID, &youtubeTask{
 		ExtractorCtx: extractorCtx,
-		Media:        media,
 	}); ok {
 		extractorCtx.CancelFunc()
 		return fmt.Errorf("failed to add youtube task")
@@ -48,7 +35,7 @@ func YouTubePromptHandler(bot *gotgbot.Bot, ctx *ext.Context, extractorCtx *mode
 		"YouTube formatini sec:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: &gotgbot.InlineKeyboardMarkup{
-				InlineKeyboard: buildYouTubeButtons(taskID, formatIDs),
+				InlineKeyboard: buildYouTubeButtons(taskID, youtube.SelectableFormatIDs()),
 			},
 		},
 	)
@@ -84,12 +71,6 @@ func YouTubeCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	defer task.ExtractorCtx.CancelFunc()
 	defer task.ExtractorCtx.FilesTracker.Cleanup()
 
-	selectedMedia, err := youtube.SelectMedia(task.Media, formatID)
-	if err != nil {
-		core.HandleError(bot, ctx, task.ExtractorCtx, err)
-		return ext.EndGroups
-	}
-
 	ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
 		Text: "Indiriliyor...",
 	})
@@ -100,6 +81,18 @@ func YouTubeCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 			ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
 		},
 	)
+
+	media, err := youtube.GetMedia(task.ExtractorCtx)
+	if err != nil {
+		core.HandleError(bot, ctx, task.ExtractorCtx, err)
+		return ext.EndGroups
+	}
+
+	selectedMedia, err := youtube.SelectMedia(media, formatID)
+	if err != nil {
+		core.HandleError(bot, ctx, task.ExtractorCtx, err)
+		return ext.EndGroups
+	}
 
 	if err := core.HandlePreparedDownloadTask(
 		bot,
