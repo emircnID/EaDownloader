@@ -1,11 +1,11 @@
-FROM golang:1.26-alpine
+FROM golang:1.26-alpine3.22
 
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     --mount=type=cache,target=/var/lib/apk,sharing=locked \
     apk add --no-cache \
-        build-base \
-        libheif-dev \
-        ffmpeg
+        build-base=0.5-r3 \
+        libheif-dev=1.19.8-r1 \
+        ffmpeg=6.1.2-r2
 
 WORKDIR /app
 

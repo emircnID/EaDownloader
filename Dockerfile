@@ -1,12 +1,12 @@
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26-alpine3.22 AS builder
 
 ENV GOCACHE=/root/.cache/go-build
 
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     --mount=type=cache,target=/var/lib/apk,sharing=locked \
     apk add --no-cache \
-        build-base \
-        libheif-dev
+        build-base=0.5-r3 \
+        libheif-dev=1.19.8-r1
 
 WORKDIR /app
 
@@ -34,8 +34,8 @@ WORKDIR /app
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     --mount=type=cache,target=/var/lib/apk,sharing=locked \
     apk add --no-cache \
-        ffmpeg \
-        libheif
+        ffmpeg=6.1.2-r2 \
+        libheif=1.19.8-r1
 
 COPY --from=builder /app/eadownloader ./eadownloader
 
