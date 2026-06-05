@@ -43,18 +43,6 @@ func parseEnvInt(env string, dest *int, required bool) {
 	}
 }
 
-func parseEnvMegabytes(env string, dest *int64, required bool) {
-	if value := os.Getenv(env); value != "" {
-		if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
-			*dest = parsed * 1024 * 1024
-		} else {
-			logger.L.Fatalf("%s env is not a valid integer", env)
-		}
-	} else if required {
-		logger.L.Fatalf("%s env is not set", env)
-	}
-}
-
 func parseEnvFileSize(env string, dest *int64, required bool) {
 	if value := os.Getenv(env); value != "" {
 		parsed, err := parseFileSize(value)

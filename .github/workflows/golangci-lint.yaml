@@ -19,8 +19,10 @@ jobs:
           go-version: stable
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
+        env:
+          GOTOOLCHAIN: go1.26.0
         with:
-          version: v2.1
+          version: v2.1.6
           args: --build-tags=lint
           install-mode: goinstall # apparently needed since prebuilt doesn't support go1.26 yet
           # skip cache to avoid flakes (and avoid using gh-action storage)

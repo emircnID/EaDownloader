@@ -155,7 +155,7 @@ func chunkFormatsForUpload(formats []*models.DownloadedFormat) ([][]*models.Down
 	const multipartLimit = 50 * 1024 * 1024
 
 	var chunks [][]*models.DownloadedFormat
-	var chunk []*models.DownloadedFormat
+	chunk := make([]*models.DownloadedFormat, 0, 10)
 	var chunkSize int64
 
 	for _, format := range formats {
@@ -170,7 +170,7 @@ func chunkFormatsForUpload(formats []*models.DownloadedFormat) ([][]*models.Down
 		if len(chunk) > 0 &&
 			(len(chunk) == 10 || chunkSize+size > multipartLimit) {
 			chunks = append(chunks, chunk)
-			chunk = nil
+			chunk = make([]*models.DownloadedFormat, 0, 10)
 			chunkSize = 0
 		}
 
