@@ -66,6 +66,7 @@ func SendFormats(
 	}
 
 	for _, chunk := range mediaGroupChunks {
+		extractorCtx.Progress("Telegram'a yukleniyor...")
 		if len(chunk) == 1 {
 			util.SendMediaAction(bot, chatID, chunk[0].Format.Type)
 			msg, err := sendSingleFormat(

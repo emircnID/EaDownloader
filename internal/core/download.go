@@ -3,12 +3,15 @@ package core
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"eadownloader/internal/database"
 	"eadownloader/internal/models"
 	"eadownloader/internal/util"
 	"eadownloader/internal/util/download"
+	"eadownloader/internal/util/libav"
 )
 
 func downloadMediaFormats(
@@ -85,7 +88,19 @@ func downloadItem(
 		return
 	}
 
-	downloadedFormat, err := downloadFormat(ctx, index, format)
+	var downloadedFormat *models.DownloadedFormat
+	downloadedFormat, err = downloadMergedVideoAudioFormats(ctx, index, item, format)
+	if err != nil {
+		formats <- &models.DownloadedFormat{
+			Index: index,
+			Error: err,
+		}
+		return
+	}
+	if downloadedFormat == nil {
+		ctx.Progress("Medya indiriliyor...")
+		downloadedFormat, err = downloadFormat(ctx, index, format)
+	}
 	if err != nil {
 		formats <- &models.DownloadedFormat{
 			Index: index,
@@ -106,8 +121,10 @@ func downloadItem(
 		return
 	}
 
-	// merge audio into video if needed
-	mergeFormats(item, downloadedFormat)
+	if downloadedFormat.Format.AudioCodec == "" {
+		// merge audio into video if needed
+		mergeFormats(item, downloadedFormat)
+	}
 
 	for _, plugin := range format.Plugins {
 		if plugin != nil {
@@ -202,9 +219,11 @@ func downloadFormat(
 		return nil, err
 	}
 
-	thumbnailFilePath, err = getThumbnail(ctx, format, filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get thumbnail: %w", err)
+	if !skipThumbnail(format) {
+		thumbnailFilePath, err = getThumbnail(ctx, format, filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get thumbnail: %w", err)
+		}
 	}
 
 	if format.MissingMetadata() {
@@ -221,6 +240,110 @@ func downloadFormat(
 		FilePath:          filePath,
 		ThumbnailFilePath: thumbnailFilePath,
 	}, nil
+}
+
+func downloadMergedVideoAudioFormats(
+	ctx *models.ExtractorContext,
+	index int,
+	item *models.MediaItem,
+	videoFormat *models.MediaFormat,
+) (*models.DownloadedFormat, error) {
+	if videoFormat.Type != database.MediaTypeVideo || videoFormat.AudioCodec != "" {
+		return nil, nil
+	}
+
+	audioFormat := item.GetDefaultAudioFormat()
+	if audioFormat == nil {
+		return nil, nil
+	}
+
+	ctx.Progress("Video ve ses indiriliyor...")
+
+	videoResult := make(chan *models.DownloadedFormat, 1)
+	audioResult := make(chan *models.DownloadedFormat, 1)
+
+	go func() {
+		videoResult <- downloadWithResult(ctx, index, videoFormat)
+	}()
+	go func() {
+		audioResult <- downloadWithResult(ctx, index, mergeAudioDownloadFormat(audioFormat))
+	}()
+
+	downloadedVideo := <-videoResult
+	downloadedAudio := <-audioResult
+
+	if downloadedVideo.Error != nil {
+		return nil, downloadedVideo.Error
+	}
+	if downloadedAudio.Error != nil {
+		return nil, downloadedAudio.Error
+	}
+
+	ctx.Progress("Video ve ses birlestiriliyor...")
+
+	outputPath := strings.TrimSuffix(
+		downloadedVideo.FilePath,
+		filepath.Ext(downloadedVideo.FilePath),
+	) + "_merged" + filepath.Ext(downloadedVideo.FilePath)
+	ctx.FilesTracker.Add(outputPath)
+
+	if err := libav.MergeVideoWithAudio(
+		downloadedVideo.FilePath,
+		downloadedAudio.FilePath,
+		outputPath,
+	); err != nil {
+		return nil, fmt.Errorf("failed to merge video with audio: %w", err)
+	}
+
+	if err := os.Rename(outputPath, downloadedVideo.FilePath); err != nil {
+		return nil, fmt.Errorf("failed to replace merged file: %w", err)
+	}
+
+	downloadedVideo.Format.AudioCodec = audioFormat.AudioCodec
+	if err := setDownloadedFileSize(downloadedVideo.Format, downloadedVideo.FilePath); err != nil {
+		return nil, err
+	}
+	if err := validateFormat(downloadedVideo.Format); err != nil {
+		return nil, err
+	}
+
+	return downloadedVideo, nil
+}
+
+func downloadWithResult(
+	ctx *models.ExtractorContext,
+	index int,
+	format *models.MediaFormat,
+) *models.DownloadedFormat {
+	downloadedFormat, err := downloadFormat(ctx, index, format)
+	if err != nil {
+		return &models.DownloadedFormat{
+			Index: index,
+			Error: err,
+		}
+	}
+	return downloadedFormat
+}
+
+func mergeAudioDownloadFormat(format *models.MediaFormat) *models.MediaFormat {
+	clone := *format
+	settings := cloneDownloadSettings(format.DownloadSettings)
+	settings.SkipThumbnail = true
+	settings.SkipRemux = true
+	clone.DownloadSettings = settings
+	return &clone
+}
+
+func cloneDownloadSettings(settings *models.DownloadSettings) *models.DownloadSettings {
+	if settings == nil {
+		return &models.DownloadSettings{}
+	}
+	clone := *settings
+	return &clone
+}
+
+func skipThumbnail(format *models.MediaFormat) bool {
+	return format.DownloadSettings != nil && format.DownloadSettings.SkipThumbnail
 }
 
 func collectDownloadedFormats(

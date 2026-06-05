@@ -43,6 +43,7 @@ type ExtractorContext struct {
 
 	// allows plugins to download additional formats
 	DownloadFunc func(*ExtractorContext, int, *MediaFormat) (*DownloadedFormat, error)
+	ProgressFunc func(string)
 }
 
 func (e *ExtractorContext) Debugf(format string, args ...interface{}) {
@@ -75,6 +76,12 @@ func (e *ExtractorContext) Errorf(format string, args ...interface{}) {
 		return
 	}
 	logger.L.Errorf(fmt.Sprintf("[%s] %s: %s", e.ContentURL, e.Extractor.ID, format), args...)
+}
+
+func (e *ExtractorContext) Progress(message string) {
+	if e.ProgressFunc != nil {
+		e.ProgressFunc(message)
+	}
 }
 
 func (e *ExtractorContext) Key() string {

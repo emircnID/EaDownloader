@@ -2,12 +2,14 @@ package models
 
 import (
 	"os"
+	"sync"
 
 	"eadownloader/internal/logger"
 )
 
 type FilesTracker struct {
 	Files []string
+	mu    sync.Mutex
 }
 
 func NewFilesTracker() *FilesTracker {
@@ -17,10 +19,16 @@ func NewFilesTracker() *FilesTracker {
 }
 
 func (ft *FilesTracker) Add(files ...string) {
+	ft.mu.Lock()
+	defer ft.mu.Unlock()
+
 	ft.Files = append(ft.Files, files...)
 }
 
 func (ft *FilesTracker) Cleanup() {
+	ft.mu.Lock()
+	defer ft.mu.Unlock()
+
 	for _, fileName := range ft.Files {
 		info, err := os.Stat(fileName)
 		if err != nil {

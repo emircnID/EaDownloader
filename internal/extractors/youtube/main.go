@@ -19,12 +19,12 @@ import (
 )
 
 const (
-	formatBest = "best"
-	format360 = "360"
-	format720 = "720"
-	format1080 = "1080"
+	formatBest  = "best"
+	format360   = "360"
+	format720   = "720"
+	format1080  = "1080"
 	formatAudio = "audio"
-	formatMP3 = "mp3"
+	formatMP3   = "mp3"
 )
 
 var qualityTargets = []int32{360, 720, 1080}
@@ -411,60 +411,51 @@ func videoMediaFormat(info *Info, format *Format, target int32) *models.MediaFor
 
 func videoMediaFormatWithID(info *Info, format *Format, formatID string) *models.MediaFormat {
 	return &models.MediaFormat{
-		FormatID:     formatID,
-		Type:         database.MediaTypeVideo,
-		VideoCodec:   util.ParseVideoCodec(format.VideoCodec),
-		AudioCodec:   audioCodec(format),
-		URL:          []string{format.URL},
-		ThumbnailURL: thumbnailURL(info),
-		Width:        format.Width,
-		Height:       format.Height,
-		Duration:     int32(info.Duration),
-		Bitrate:      int64(format.TBR * 1000),
-		FileSize:     fileSize(format),
-		DownloadSettings: &models.DownloadSettings{
-			Headers: downloadHeaders(),
-			Retries: 3,
-		},
+		FormatID:         formatID,
+		Type:             database.MediaTypeVideo,
+		VideoCodec:       util.ParseVideoCodec(format.VideoCodec),
+		AudioCodec:       audioCodec(format),
+		URL:              []string{format.URL},
+		ThumbnailURL:     thumbnailURL(info),
+		Width:            format.Width,
+		Height:           format.Height,
+		Duration:         int32(info.Duration),
+		Bitrate:          int64(format.TBR * 1000),
+		FileSize:         fileSize(format),
+		DownloadSettings: youtubeDownloadSettings(),
 	}
 }
 
 func mergeAudioMediaFormat(info *Info, format *Format) *models.MediaFormat {
 	return &models.MediaFormat{
-		FormatID:     formatAudio,
-		Type:         database.MediaTypeAudio,
-		AudioCodec:   util.ParseAudioCodec(format.AudioCodec),
-		URL:          []string{format.URL},
-		ThumbnailURL: thumbnailURL(info),
-		Duration:     int32(info.Duration),
-		Title:        info.Title,
-		Artist:       info.Uploader,
-		Bitrate:      int64(format.TBR * 1000),
-		FileSize:     fileSize(format),
-		DownloadSettings: &models.DownloadSettings{
-			Headers: downloadHeaders(),
-			Retries: 3,
-		},
+		FormatID:         formatAudio,
+		Type:             database.MediaTypeAudio,
+		AudioCodec:       util.ParseAudioCodec(format.AudioCodec),
+		URL:              []string{format.URL},
+		ThumbnailURL:     thumbnailURL(info),
+		Duration:         int32(info.Duration),
+		Title:            info.Title,
+		Artist:           info.Uploader,
+		Bitrate:          int64(format.TBR * 1000),
+		FileSize:         fileSize(format),
+		DownloadSettings: youtubeDownloadSettings(),
 	}
 }
 
 func mp3AudioMediaFormat(info *Info, format *Format) *models.MediaFormat {
 	return &models.MediaFormat{
-		FormatID:     formatMP3,
-		Type:         database.MediaTypeAudio,
-		AudioCodec:   database.MediaCodecMp3,
-		URL:          []string{format.URL},
-		ThumbnailURL: thumbnailURL(info),
-		Duration:     int32(info.Duration),
-		Title:        info.Title,
-		Artist:       info.Uploader,
-		Bitrate:      0,
-		FileSize:     fileSize(format),
-		DownloadSettings: &models.DownloadSettings{
-			Headers: downloadHeaders(),
-			Retries: 3,
-		},
-		Plugins: []*models.Plugin{plugins.ConvertAudioToMP3},
+		FormatID:         formatMP3,
+		Type:             database.MediaTypeAudio,
+		AudioCodec:       database.MediaCodecMp3,
+		URL:              []string{format.URL},
+		ThumbnailURL:     thumbnailURL(info),
+		Duration:         int32(info.Duration),
+		Title:            info.Title,
+		Artist:           info.Uploader,
+		Bitrate:          0,
+		FileSize:         fileSize(format),
+		DownloadSettings: youtubeDownloadSettings(),
+		Plugins:          []*models.Plugin{plugins.ConvertAudioToMP3},
 	}
 }
 
@@ -494,6 +485,15 @@ func downloadHeaders() map[string]string {
 	return map[string]string{
 		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 		"Referer":    "https://www.youtube.com/",
+	}
+}
+
+func youtubeDownloadSettings() *models.DownloadSettings {
+	return &models.DownloadSettings{
+		Headers:        downloadHeaders(),
+		NumConnections: 4,
+		Retries:        3,
+		SkipRemux:      true,
 	}
 }
 

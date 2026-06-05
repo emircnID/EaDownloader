@@ -9,4 +9,6 @@ type DownloadSettings struct {
 	Cookies        []*http.Cookie
 	DecryptionKey  *DecryptionKey
 	Retries        int
+	SkipRemux      bool
+	SkipThumbnail  bool
 }

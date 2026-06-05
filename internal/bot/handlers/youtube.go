@@ -102,15 +102,11 @@ func YouTubeCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	defer task.ExtractorCtx.FilesTracker.Cleanup()
 
 	ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
-		Text: "Indiriliyor...",
+		Text: "Format bilgisi aliniyor...",
 	})
-	ctx.EffectiveMessage.EditText(
-		bot,
-		"Indiriliyor...",
-		&gotgbot.EditMessageTextOpts{
-			ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
-		},
-	)
+	progress := youtubeProgressReporter(bot, ctx)
+	task.ExtractorCtx.ProgressFunc = progress
+	progress("Format bilgisi aliniyor...")
 
 	media, err := youtube.GetMedia(task.ExtractorCtx)
 	if err != nil {
@@ -123,6 +119,8 @@ func YouTubeCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		core.HandleError(bot, ctx, task.ExtractorCtx, err)
 		return ext.EndGroups
 	}
+
+	progress("Indirme hazirlaniyor...")
 
 	if err := core.HandlePreparedDownloadTask(
 		bot,
@@ -138,6 +136,23 @@ func YouTubeCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	ctx.EffectiveMessage.Delete(bot, nil)
 	return ext.EndGroups
+}
+
+func youtubeProgressReporter(bot *gotgbot.Bot, ctx *ext.Context) func(string) {
+	var lastMessage string
+	return func(message string) {
+		if message == "" || message == lastMessage {
+			return
+		}
+		lastMessage = message
+		ctx.EffectiveMessage.EditText(
+			bot,
+			message,
+			&gotgbot.EditMessageTextOpts{
+				ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+			},
+		)
+	}
 }
 
 func buildYouTubeButtons(taskID string, formatIDs []string) [][]gotgbot.InlineKeyboardButton {

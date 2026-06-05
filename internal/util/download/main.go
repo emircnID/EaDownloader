@@ -63,20 +63,22 @@ func DownloadFile(
 			}
 		}
 
-		outputPath := strings.TrimSuffix(
-			filePath,
-			filepath.Ext(filePath),
-		) + "_remuxed" + filepath.Ext(filePath)
-		ctx.FilesTracker.Add(outputPath)
+		if !settings.SkipRemux {
+			outputPath := strings.TrimSuffix(
+				filePath,
+				filepath.Ext(filePath),
+			) + "_remuxed" + filepath.Ext(filePath)
+			ctx.FilesTracker.Add(outputPath)
 
-		err = libav.RemuxFile(filePath, outputPath)
-		if err != nil {
-			ctx.Warnf("remuxing failed, using original file: %v", err)
-			return filePath, nil
+			err = libav.RemuxFile(filePath, outputPath)
+			if err != nil {
+				ctx.Warnf("remuxing failed, using original file: %v", err)
+				return filePath, nil
+			}
+
+			// replace original file with remuxed file
+			os.Rename(outputPath, filePath)
 		}
-
-		// replace original file with remuxed file
-		os.Rename(outputPath, filePath)
 
 		return filePath, nil
 	}
@@ -134,20 +136,22 @@ func DownloadFileWithSegments(
 		return "", err
 	}
 
-	outputPath := strings.TrimSuffix(
-		filePath,
-		filepath.Ext(filePath),
-	) + "_remuxed" + filepath.Ext(filePath)
-	ctx.FilesTracker.Add(outputPath)
+	if !settings.SkipRemux {
+		outputPath := strings.TrimSuffix(
+			filePath,
+			filepath.Ext(filePath),
+		) + "_remuxed" + filepath.Ext(filePath)
+		ctx.FilesTracker.Add(outputPath)
 
-	err = libav.RemuxFile(filePath, outputPath)
-	if err != nil {
-		ctx.Warnf("remuxing failed, using original file: %v", err)
-		return filePath, nil
+		err = libav.RemuxFile(filePath, outputPath)
+		if err != nil {
+			ctx.Warnf("remuxing failed, using original file: %v", err)
+			return filePath, nil
+		}
+
+		// replace original file with remuxed file
+		os.Rename(outputPath, filePath)
 	}
-
-	// replace original file with remuxed file
-	os.Rename(outputPath, filePath)
 
 	return filePath, nil
 }
