@@ -6,6 +6,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -47,7 +48,13 @@ var (
 	titlePattern = regexp.MustCompile(
 		`"title"\s*:\s*\{\s*"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`,
 	)
-	ogVideoPattern = regexp.MustCompile(`<meta\s+property="og:video(?::secure_url)?"\s+content="([^"]+)"`)
+	ogVideoPattern   = regexp.MustCompile(`<meta\s+property="og:video(?::secure_url)?"\s+content="([^"]+)"`)
+	imageURLPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`<meta\s+property="og:image(?::secure_url)?"\s+content="([^"]+)"`),
+		regexp.MustCompile(`"image"\s*:\s*\{\s*"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`"photo_image"\s*:\s*\{\s*"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`"preferred_thumbnail"\s*:\s*\{\s*"image"\s*:\s*\{\s*"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+	}
 )
 
 func GetVideoData(ctx *models.ExtractorContext) (*VideoData, error) {
@@ -107,13 +114,17 @@ func parseVideoFromBody(body []byte, videoID string) (*VideoData, error) {
 	if data.SDURL == "" {
 		data.SDURL = firstMatchedURL(body, []*regexp.Regexp{ogVideoPattern})
 	}
+	data.ImageURLs = matchedImageURLs(section)
+	if len(data.ImageURLs) == 0 {
+		data.ImageURLs = firstMatchedImageURL(body)
+	}
 	// title can be anywhere in the page
 	if match := titlePattern.FindSubmatch(body); len(match) >= 2 {
 		data.Title = unescapeFacebookString(string(match[1]))
 	}
 
-	if data.HDURL == "" && data.SDURL == "" {
-		return nil, fmt.Errorf("no video URLs found in page")
+	if data.HDURL == "" && data.SDURL == "" && len(data.ImageURLs) == 0 {
+		return nil, fmt.Errorf("no media URLs found in page")
 	}
 
 	return data, nil
@@ -127,6 +138,52 @@ func firstMatchedURL(body []byte, patterns []*regexp.Regexp) string {
 		}
 	}
 	return ""
+}
+
+func matchedImageURLs(sections ...[]byte) []string {
+	seen := make(map[string]struct{})
+	imageURLs := make([]string, 0)
+	for _, section := range sections {
+		for _, pattern := range imageURLPatterns {
+			for _, match := range pattern.FindAllSubmatch(section, -1) {
+				if len(match) < 2 {
+					continue
+				}
+				imageURL := unescapeFacebookURL(string(match[1]))
+				if !isFacebookImageURL(imageURL) {
+					continue
+				}
+				if _, ok := seen[imageURL]; ok {
+					continue
+				}
+				seen[imageURL] = struct{}{}
+				imageURLs = append(imageURLs, imageURL)
+			}
+		}
+	}
+	return imageURLs
+}
+
+func firstMatchedImageURL(body []byte) []string {
+	match := imageURLPatterns[0].FindSubmatch(body)
+	if len(match) < 2 {
+		return nil
+	}
+	imageURL := unescapeFacebookURL(string(match[1]))
+	if !isFacebookImageURL(imageURL) {
+		return nil
+	}
+	return []string{imageURL}
+}
+
+func isFacebookImageURL(imageURL string) bool {
+	parsedURL, err := url.Parse(imageURL)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(parsedURL.Hostname())
+	return strings.Contains(host, "fbcdn.net") ||
+		strings.Contains(host, "fbsbx.com")
 }
 
 // findVideoSection returns the slice of body containing the video delivery

@@ -59,7 +59,7 @@ var Extractor = &models.Extractor{
 
 	URLPattern: regexp.MustCompile(
 		`https?://(?:(?:www|m|mbasic)\.)?facebook\.com/` +
-			`(?:watch/?\?(?:[^&]*&)*v=|(?:reel|videos?|posts?)/|[^/]+/(?:videos|posts|reels?)/)` +
+			`(?:watch/?\?(?:[^&]*&)*v=|(?:reel|videos?|posts?|photo)/|permalink\.php\?(?:[^#\s&]+&)*story_fbid=|photo\.php\?(?:[^#\s&]+&)*fbid=|[^/]+/(?:videos|posts|reels?)/)` +
 			`(?P<id>[a-zA-Z0-9]+)`,
 	),
 	Host: facebookHost,
@@ -89,7 +89,6 @@ func buildMedia(ctx *models.ExtractorContext, data *VideoData) (*models.Media, e
 		media.SetCaption(data.Title)
 	}
 
-	item := media.NewItem()
 	var formats []*models.MediaFormat
 
 	if data.HDURL != "" {
@@ -113,10 +112,23 @@ func buildMedia(ctx *models.ExtractorContext, data *VideoData) (*models.Media, e
 		})
 	}
 
-	if len(formats) == 0 {
-		return nil, fmt.Errorf("no video formats found")
+	if len(formats) > 0 {
+		item := media.NewItem()
+		item.AddFormats(formats...)
+		return media, nil
 	}
 
-	item.AddFormats(formats...)
+	for _, imageURL := range data.ImageURLs {
+		item := media.NewItem()
+		item.AddFormats(&models.MediaFormat{
+			FormatID: "image",
+			Type:     database.MediaTypePhoto,
+			URL:      []string{imageURL},
+		})
+	}
+
+	if len(media.Items) == 0 {
+		return nil, fmt.Errorf("no media found")
+	}
 	return media, nil
 }
