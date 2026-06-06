@@ -1,6 +1,6 @@
 package facebook
 
-// VideoData holds extracted video information from Facebook page HTML.
+// VideoData holds extracted media information from Facebook page HTML.
 type VideoData struct {
 	HDURL     string
 	SDURL     string

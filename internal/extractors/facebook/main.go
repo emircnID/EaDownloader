@@ -78,7 +78,7 @@ var Extractor = &models.Extractor{
 func GetMedia(ctx *models.ExtractorContext) (*models.Media, error) {
 	videoData, err := GetVideoData(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get video data: %w", err)
+		return nil, fmt.Errorf("failed to get media data: %w", err)
 	}
 	return buildMedia(ctx, videoData)
 }

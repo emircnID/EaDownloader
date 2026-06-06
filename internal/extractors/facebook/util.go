@@ -48,12 +48,16 @@ var (
 	titlePattern = regexp.MustCompile(
 		`"title"\s*:\s*\{\s*"text"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`,
 	)
-	ogVideoPattern   = regexp.MustCompile(`<meta\s+property="og:video(?::secure_url)?"\s+content="([^"]+)"`)
+	ogVideoPattern   = regexp.MustCompile(`<meta\s+property=["']og:video(?::secure_url)?["']\s+content=["']([^"']+)["']`)
 	imageURLPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`<meta\s+property="og:image(?::secure_url)?"\s+content="([^"]+)"`),
-		regexp.MustCompile(`"image"\s*:\s*\{\s*"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
-		regexp.MustCompile(`"photo_image"\s*:\s*\{\s*"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
-		regexp.MustCompile(`"preferred_thumbnail"\s*:\s*\{\s*"image"\s*:\s*\{\s*"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`<meta\s+property=["']og:image(?::secure_url)?["']\s+content=["']([^"']+)["']`),
+		regexp.MustCompile(`<meta\s+content=["']([^"']+)["']\s+property=["']og:image(?::secure_url)?["']`),
+		regexp.MustCompile(`"image"\s*:\s*\{[^{}]{0,800}"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`"image"\s*:\s*\{[^{}]{0,800}"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`"photo_image"\s*:\s*\{[^{}]{0,800}"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`"photo_image"\s*:\s*\{[^{}]{0,800}"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`"preferred_thumbnail"\s*:\s*\{[^{}]{0,999}"image"\s*:\s*\{[^{}]{0,800}"uri"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
+		regexp.MustCompile(`"preferred_thumbnail"\s*:\s*\{[^{}]{0,999}"image"\s*:\s*\{[^{}]{0,800}"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`),
 	}
 )
 
