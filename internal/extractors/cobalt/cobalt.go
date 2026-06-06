@@ -12,10 +12,19 @@ import (
 )
 
 type Request struct {
-	URL             string `json:"url"`
-	VideoQuality    string `json:"vQuality,omitempty"`
-	FilenameStyle   string `json:"filenameStyle,omitempty"`
-	DisableMetadata bool   `json:"disableMetadata,omitempty"`
+	URL                   string `json:"url"`
+	AudioBitrate          string `json:"audioBitrate,omitempty"`
+	AudioFormat           string `json:"audioFormat,omitempty"`
+	DownloadMode          string `json:"downloadMode,omitempty"`
+	FilenameStyle         string `json:"filenameStyle,omitempty"`
+	VideoQuality          string `json:"videoQuality,omitempty"`
+	DisableMetadata       bool   `json:"disableMetadata,omitempty"`
+	AlwaysProxy           bool   `json:"alwaysProxy,omitempty"`
+	LocalProcessing       string `json:"localProcessing,omitempty"`
+	YoutubeVideoCodec     string `json:"youtubeVideoCodec,omitempty"`
+	YoutubeVideoContainer string `json:"youtubeVideoContainer,omitempty"`
+	YoutubeBetterAudio    bool   `json:"youtubeBetterAudio,omitempty"`
+	YoutubeHLS            bool   `json:"youtubeHLS,omitempty"`
 }
 
 type Response struct {
@@ -39,11 +48,33 @@ type Error struct {
 }
 
 func GetMedia(url string) (*Response, error) {
-	reqData := Request{
+	return GetMediaWithOptions(Request{
 		URL:             url,
-		VideoQuality:    "1080",
-		FilenameStyle:   "classic",
 		DisableMetadata: true,
+	})
+}
+
+func GetMediaWithOptions(reqData Request) (*Response, error) {
+	if reqData.VideoQuality == "" {
+		reqData.VideoQuality = "1080"
+	}
+	if reqData.FilenameStyle == "" {
+		reqData.FilenameStyle = "basic"
+	}
+	if reqData.YoutubeVideoCodec == "" {
+		reqData.YoutubeVideoCodec = "h264"
+	}
+	if reqData.YoutubeVideoContainer == "" {
+		reqData.YoutubeVideoContainer = "mp4"
+	}
+	if reqData.DownloadMode == "" {
+		reqData.DownloadMode = "auto"
+	}
+	if reqData.AudioFormat == "" {
+		reqData.AudioFormat = "mp3"
+	}
+	if reqData.AudioBitrate == "" {
+		reqData.AudioBitrate = "128"
 	}
 
 	body, err := json.Marshal(reqData)

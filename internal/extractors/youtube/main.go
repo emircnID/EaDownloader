@@ -46,11 +46,26 @@ var Extractor = &models.Extractor{
 }
 
 func GetMedia(ctx *models.ExtractorContext) (*models.Media, error) {
-	info, err := FetchInfo(ctx)
-	if err != nil {
-		return nil, err
+	return BuildFastMedia(ctx), nil
+}
+
+func BuildFastMedia(ctx *models.ExtractorContext) *models.Media {
+	media := ctx.NewMedia()
+	media.ContentID = ctx.ContentID
+	media.ContentURL = ctx.ContentURL
+	media.SetCaption("YouTube")
+
+	item := media.NewItem()
+	for _, target := range qualityTargets {
+		item.AddFormats(cobaltVideoMediaFormat(ctx.ContentURL, fmt.Sprintf("%d", target), target))
 	}
-	return BuildMedia(ctx, info)
+	item.AddFormats(cobaltAudioMediaFormat(ctx.ContentURL))
+
+	if IsShortsURL(ctx.ContentURL) {
+		item.AddFormats(cobaltVideoMediaFormat(ctx.ContentURL, formatBest, 1080))
+	}
+
+	return media
 }
 
 func FetchInfo(ctx *models.ExtractorContext) (*Info, error) {
@@ -370,6 +385,28 @@ func videoMediaFormatWithID(info *Info, format *Format, formatID string) *models
 	}
 }
 
+func cobaltVideoMediaFormat(contentURL string, formatID string, target int32) *models.MediaFormat {
+	return &models.MediaFormat{
+		FormatID:         formatID,
+		Type:             database.MediaTypeVideo,
+		VideoCodec:       database.MediaCodecAvc,
+		AudioCodec:       database.MediaCodecAac,
+		ThumbnailURL:     nil,
+		Width:            videoWidth(target),
+		Height:           target,
+		DownloadSettings: youtubeVideoDownloadSettings(contentURL, formatID),
+	}
+}
+
+func cobaltAudioMediaFormat(contentURL string) *models.MediaFormat {
+	return &models.MediaFormat{
+		FormatID:         formatMP3,
+		Type:             database.MediaTypeAudio,
+		AudioCodec:       database.MediaCodecMp3,
+		DownloadSettings: youtubeAudioDownloadSettings(contentURL),
+	}
+}
+
 func mp3AudioMediaFormat(info *Info, format *Format) *models.MediaFormat {
 	return &models.MediaFormat{
 		FormatID:         formatMP3,
@@ -413,12 +450,17 @@ func youtubeVideoDownloadSettings(contentURL string, formatID string) *models.Do
 		target = 1080
 	}
 	settings := youtubeDownloadSettings(contentURL, youtubeVideoSelector(target))
+	settings.CobaltURL = contentURL
+	settings.CobaltQuality = fmt.Sprintf("%d", target)
 	settings.YtDLPSort = youtubeVideoSort(target)
 	return settings
 }
 
 func youtubeAudioDownloadSettings(contentURL string) *models.DownloadSettings {
 	settings := youtubeDownloadSettings(contentURL, "bestaudio/best")
+	settings.CobaltURL = contentURL
+	settings.CobaltQuality = "1080"
+	settings.CobaltAudio = true
 	settings.YtDLPAudio = true
 	return settings
 }
@@ -482,6 +524,13 @@ func compareSmallerVideo(left, right *Format) int {
 		return 1
 	}
 	return 0
+}
+
+func videoWidth(height int32) int32 {
+	if height <= 0 {
+		return 0
+	}
+	return height * 16 / 9
 }
 
 func qualityHeight(format *Format) int32 {
