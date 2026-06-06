@@ -270,16 +270,9 @@ func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup
 			statsPeriodButton("all", "all", screen),
 		},
 		{
-			{Text: "Users", CallbackData: statsCallbackPrefix + statsScreenUsers},
-			{Text: "Groups", CallbackData: statsCallbackPrefix + statsScreenGroups},
-		},
-		{
 			{Text: "Platforms", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
 			{Text: "Errors", CallbackData: statsCallbackPrefix + statsScreenErrors},
 		},
-	}
-	if screen == statsScreenUsers {
-		buttons = append(buttons, getRecentUserBanKeyboardRows()...)
 	}
 	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
 		{Text: "Overview", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},

@@ -23,10 +23,13 @@ const (
 	adminScreenHome   = "home"
 	adminScreenSystem = "system"
 	adminScreenBans   = "bans"
+	adminScreenUsers  = "users"
+	adminScreenGroups = "groups"
 
 	adminActionBan        = "ban"
 	adminActionBanConfirm = "ban_confirm"
 	adminActionUnban      = "unban"
+	adminActionUserUnban  = "user_unban"
 )
 
 func AdminHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
@@ -34,9 +37,14 @@ func AdminHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return ext.EndGroups
 	}
 
+	text, err := formatAdminHome()
+	if err != nil {
+		return err
+	}
+
 	ctx.EffectiveMessage.Reply(
 		bot,
-		formatAdminHome(),
+		text,
 		&gotgbot.SendMessageOpts{
 			ParseMode:   gotgbot.ParseModeHTML,
 			ReplyMarkup: getAdminKeyboard(),
@@ -69,21 +77,29 @@ func AdminCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 func resolveAdminCallback(ctx *ext.Context) (string, gotgbot.InlineKeyboardMarkup, error) {
 	data := strings.TrimPrefix(ctx.CallbackQuery.Data, adminCallbackPrefix)
-	text := formatAdminHome()
+	text, err := formatAdminHome()
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
 	keyboard := getAdminKeyboard()
 
 	switch {
 	case data == adminScreenSystem:
-		var err error
 		text, err = formatAdminSystem()
 		keyboard = getAdminSystemKeyboard()
 		return text, keyboard, err
 	case data == adminScreenBans:
 		return formatAdminBans()
+	case data == adminScreenUsers:
+		return formatAdminUsers()
+	case data == adminScreenGroups:
+		return formatAdminGroups()
 	case strings.HasPrefix(data, adminActionBanConfirm+":"):
 		return banUserFromCallback(ctx, strings.TrimPrefix(data, adminActionBanConfirm+":"))
 	case strings.HasPrefix(data, adminActionBan+":"):
 		return formatAdminBanConfirm(strings.TrimPrefix(data, adminActionBan+":"))
+	case strings.HasPrefix(data, adminActionUserUnban+":"):
+		return unbanUserFromUsersCallback(strings.TrimPrefix(data, adminActionUserUnban+":"))
 	case strings.HasPrefix(data, adminActionUnban+":"):
 		return unbanUserFromCallback(strings.TrimPrefix(data, adminActionUnban+":"))
 	default:
@@ -91,9 +107,35 @@ func resolveAdminCallback(ctx *ext.Context) (string, gotgbot.InlineKeyboardMarku
 	}
 }
 
-func formatAdminHome() string {
-	return "<b>EaDownloader admin</b>\n\n" +
-		"Control center. Stats are kept in their own detailed screen; user bans live here."
+func formatAdminHome() (string, error) {
+	stats, err := database.Q().GetStats(
+		context.Background(),
+		pgtype.Timestamptz{
+			Time:  time.Now().Add(-100 * 365 * 24 * time.Hour),
+			Valid: true,
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+	bannedUsersCount, err := database.Q().CountBannedUsers(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(
+		"<b>EaDownloader admin</b>\n\n"+
+			"<b>Dashboard</b>\n"+
+			"Private users: %d\n"+
+			"Groups: %d\n"+
+			"Downloads: %d\n"+
+			"Banned users: %d\n\n"+
+			"Use Stats for analytics, User Management for moderation.",
+		stats.TotalPrivateChats,
+		stats.TotalGroupChats,
+		stats.TotalDownloads,
+		bannedUsersCount,
+	), nil
 }
 
 func formatAdminSystem() (string, error) {
@@ -155,6 +197,50 @@ func formatAdminBans() (string, gotgbot.InlineKeyboardMarkup, error) {
 	return strings.TrimSpace(message), getAdminBansKeyboard(rows), nil
 }
 
+func formatAdminUsers() (string, gotgbot.InlineKeyboardMarkup, error) {
+	rows, err := database.Q().ListChatsByType(
+		context.Background(),
+		database.ListChatsByTypeParams{
+			Type:       database.ChatTypePrivate,
+			LimitCount: statsListLimit,
+		},
+	)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+
+	message := fmt.Sprintf("<b>User management</b>\nLast %d active private users\n\n", len(rows))
+	if len(rows) == 0 {
+		message += "No users recorded yet."
+	} else {
+		for i, row := range rows {
+			status := "active"
+			if banned, err := database.Q().IsUserBanned(context.Background(), row.ChatID); err == nil && banned {
+				status = "banned"
+			}
+			message += fmt.Sprintf(
+				"<b>%d. %s</b>\nID: <code>%d</code>\nStatus: %s\nLanguage: %s\nLast seen: %s\n\n",
+				i+1,
+				formatChatDisplayName(row),
+				row.ChatID,
+				status,
+				html.EscapeString(row.Language),
+				formatTimeAgo(row.LastSeenAt),
+			)
+		}
+	}
+
+	return strings.TrimSpace(message), getAdminUsersKeyboard(rows), nil
+}
+
+func formatAdminGroups() (string, gotgbot.InlineKeyboardMarkup, error) {
+	text, err := formatChatList(database.ChatTypeGroup)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+	return text, getAdminSectionKeyboard(), nil
+}
+
 func formatAdminBanConfirm(value string) (string, gotgbot.InlineKeyboardMarkup, error) {
 	userID, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
@@ -171,7 +257,7 @@ func formatAdminBanConfirm(value string) (string, gotgbot.InlineKeyboardMarkup, 
 				{Text: "Confirm ban", CallbackData: adminCallbackPrefix + adminActionBanConfirm + ":" + strconv.FormatInt(userID, 10)},
 			},
 			{
-				{Text: "Back", CallbackData: statsCallbackPrefix + statsScreenUsers},
+				{Text: "Back", CallbackData: adminCallbackPrefix + adminScreenUsers},
 				{Text: "Close", CallbackData: "close"},
 			},
 		},
@@ -181,7 +267,7 @@ func formatAdminBanConfirm(value string) (string, gotgbot.InlineKeyboardMarkup, 
 func banUserFromCallback(ctx *ext.Context, value string) (string, gotgbot.InlineKeyboardMarkup, error) {
 	userID, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
-		return formatAdminBans()
+		return formatAdminUsers()
 	}
 	if util.IsAdminID(userID) {
 		return "<b>Ban skipped</b>\n\nAdmins cannot be banned.", getAdminSystemKeyboard(), nil
@@ -198,7 +284,18 @@ func banUserFromCallback(ctx *ext.Context, value string) (string, gotgbot.Inline
 	if err != nil {
 		return "", gotgbot.InlineKeyboardMarkup{}, err
 	}
-	return formatAdminBans()
+	return formatAdminUsers()
+}
+
+func unbanUserFromUsersCallback(value string) (string, gotgbot.InlineKeyboardMarkup, error) {
+	userID, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return formatAdminUsers()
+	}
+	if err := database.Q().UnbanUser(context.Background(), userID); err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+	return formatAdminUsers()
 }
 
 func unbanUserFromCallback(value string) (string, gotgbot.InlineKeyboardMarkup, error) {
@@ -220,10 +317,11 @@ func getAdminKeyboard() gotgbot.InlineKeyboardMarkup {
 				{Text: "System", CallbackData: adminCallbackPrefix + adminScreenSystem},
 			},
 			{
-				{Text: "Ban Users", CallbackData: statsCallbackPrefix + statsScreenUsers},
-				{Text: "Banned Users", CallbackData: adminCallbackPrefix + adminScreenBans},
+				{Text: "User Management", CallbackData: adminCallbackPrefix + adminScreenUsers},
+				{Text: "Groups", CallbackData: adminCallbackPrefix + adminScreenGroups},
 			},
 			{
+				{Text: "Banned Users", CallbackData: adminCallbackPrefix + adminScreenBans},
 				{Text: "Close", CallbackData: "close"},
 			},
 		},
@@ -241,6 +339,35 @@ func getAdminSystemKeyboard() gotgbot.InlineKeyboardMarkup {
 	}
 }
 
+func getAdminUsersKeyboard(rows []database.ListChatsByTypeRow) gotgbot.InlineKeyboardMarkup {
+	buttons := make([][]gotgbot.InlineKeyboardButton, 0, len(rows)+2)
+	for _, row := range rows {
+		if util.IsAdminID(row.ChatID) {
+			continue
+		}
+		action := adminActionBan
+		prefix := "Ban "
+		if banned, err := database.Q().IsUserBanned(context.Background(), row.ChatID); err == nil && banned {
+			action = adminActionUserUnban
+			prefix = "Unban "
+		}
+		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+			{
+				Text:         prefix + truncateButtonText(chatDisplayLabel(row), 40),
+				CallbackData: adminCallbackPrefix + action + ":" + strconv.FormatInt(row.ChatID, 10),
+			},
+		})
+	}
+	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+		{Text: "Banned Users", CallbackData: adminCallbackPrefix + adminScreenBans},
+	})
+	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+		{Text: "Back", CallbackData: adminCallbackPrefix + adminScreenHome},
+		{Text: "Close", CallbackData: "close"},
+	})
+	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
+}
+
 func getAdminBansKeyboard(rows []database.ListBannedUsersRow) gotgbot.InlineKeyboardMarkup {
 	buttons := make([][]gotgbot.InlineKeyboardButton, 0, len(rows)+1)
 	for _, row := range rows {
@@ -256,39 +383,6 @@ func getAdminBansKeyboard(rows []database.ListBannedUsersRow) gotgbot.InlineKeyb
 		{Text: "Close", CallbackData: "close"},
 	})
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
-}
-
-func getRecentUserBanKeyboardRows() [][]gotgbot.InlineKeyboardButton {
-	rows, err := database.Q().ListChatsByType(
-		context.Background(),
-		database.ListChatsByTypeParams{
-			Type:       database.ChatTypePrivate,
-			LimitCount: 5,
-		},
-	)
-	if err != nil {
-		return nil
-	}
-
-	buttons := make([][]gotgbot.InlineKeyboardButton, 0, len(rows))
-	for _, row := range rows {
-		if util.IsAdminID(row.ChatID) {
-			continue
-		}
-		action := adminActionBan
-		prefix := "Ban "
-		if banned, err := database.Q().IsUserBanned(context.Background(), row.ChatID); err == nil && banned {
-			action = adminActionUnban
-			prefix = "Unban "
-		}
-		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
-			{
-				Text:         prefix + truncateButtonText(chatDisplayLabel(row), 40),
-				CallbackData: adminCallbackPrefix + action + ":" + strconv.FormatInt(row.ChatID, 10),
-			},
-		})
-	}
-	return buttons
 }
 
 func formatBannedUserDisplayName(row database.ListBannedUsersRow) string {
@@ -331,4 +425,15 @@ func truncateButtonText(text string, limit int) string {
 		return text
 	}
 	return text[:limit-3] + "..."
+}
+
+func getAdminSectionKeyboard() gotgbot.InlineKeyboardMarkup {
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{Text: "Back", CallbackData: adminCallbackPrefix + adminScreenHome},
+				{Text: "Close", CallbackData: "close"},
+			},
+		},
+	}
 }
