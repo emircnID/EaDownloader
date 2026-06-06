@@ -97,6 +97,20 @@ func newDispatcher() *ext.Dispatcher {
 }
 
 func registerHandlers(dispatcher *ext.Dispatcher) *ext.Dispatcher {
+	// bans
+	dispatcher.AddHandlerToGroup(handlers.NewMessage(
+		message.All,
+		botHandlers.BannedUserHandler,
+	), -90)
+	dispatcher.AddHandlerToGroup(handlers.NewCallback(
+		callbackquery.All,
+		botHandlers.BannedUserHandler,
+	), -90)
+	dispatcher.AddHandlerToGroup(handlers.NewInlineQuery(
+		inlinequery.All,
+		botHandlers.BannedUserHandler,
+	), -90)
+
 	// url
 	dispatcher.AddHandler(handlers.NewMessage(
 		botHandlers.URLFilter,

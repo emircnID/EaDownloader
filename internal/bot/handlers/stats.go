@@ -262,27 +262,32 @@ func formatRecentErrors() (string, error) {
 }
 
 func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup {
-	return gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			{
-				statsPeriodButton("24h", "1d", screen),
-				statsPeriodButton("7d", "7d", screen),
-				statsPeriodButton("30d", "30d", screen),
-				statsPeriodButton("all", "all", screen),
-			},
-			{
-				{Text: "Users", CallbackData: statsCallbackPrefix + statsScreenUsers},
-				{Text: "Groups", CallbackData: statsCallbackPrefix + statsScreenGroups},
-			},
-			{
-				{Text: "Platforms", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
-				{Text: "Errors", CallbackData: statsCallbackPrefix + statsScreenErrors},
-			},
-			{
-				{Text: "Overview", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
-				{Text: "Admin", CallbackData: adminCallbackPrefix + adminScreenHome},
-			},
+	buttons := [][]gotgbot.InlineKeyboardButton{
+		{
+			statsPeriodButton("24h", "1d", screen),
+			statsPeriodButton("7d", "7d", screen),
+			statsPeriodButton("30d", "30d", screen),
+			statsPeriodButton("all", "all", screen),
 		},
+		{
+			{Text: "Users", CallbackData: statsCallbackPrefix + statsScreenUsers},
+			{Text: "Groups", CallbackData: statsCallbackPrefix + statsScreenGroups},
+		},
+		{
+			{Text: "Platforms", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
+			{Text: "Errors", CallbackData: statsCallbackPrefix + statsScreenErrors},
+		},
+	}
+	if screen == statsScreenUsers {
+		buttons = append(buttons, getRecentUserBanKeyboardRows()...)
+	}
+	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+		{Text: "Overview", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
+		{Text: "Admin", CallbackData: adminCallbackPrefix + adminScreenHome},
+	})
+
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: buttons,
 	}
 }
 

@@ -147,6 +147,13 @@ func (ns NullMediaType) Value() (driver.Value, error) {
 	return string(ns.MediaType), nil
 }
 
+type BannedUsers struct {
+	UserID    int64
+	Reason    string
+	BannedBy  int64
+	CreatedAt pgtype.Timestamptz
+}
+
 type Chat struct {
 	ChatID     int64
 	Type       ChatType
