@@ -254,10 +254,6 @@ func validateFormat(fmt *models.MediaFormat) error {
 }
 
 func telegramUploadLimit(fmt *models.MediaFormat) int64 {
-	if !util.IsOfficialTelegramAPI() {
-		return config.Env.MaxFileSize
-	}
-
 	_, fileType := fmt.GetInfo()
 	if fileType == models.FileTypePhoto {
 		return 10 * 1024 * 1024

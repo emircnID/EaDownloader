@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"eadownloader/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -90,7 +89,6 @@ func NewBotClient() Client {
 			UseTestEnvironment: false,
 			DefaultRequestOpts: &gotgbot.RequestOpts{
 				Timeout: 10 * time.Minute,
-				APIURL:  config.Env.BotAPIURL,
 			},
 		},
 	}

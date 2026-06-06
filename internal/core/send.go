@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	"eadownloader/internal/config"
 	"eadownloader/internal/database"
@@ -95,7 +94,6 @@ func SendFormats(
 			inputMedia, err := f.Format.GetInputMedia(
 				f.FilePath, f.ThumbnailFilePath,
 				caption, options.IsSpoiler,
-				useLocalFilePathUpload(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get input media: %w", err)
@@ -150,10 +148,6 @@ func SendFormats(
 }
 
 func chunkFormatsForUpload(formats []*models.DownloadedFormat) ([][]*models.DownloadedFormat, error) {
-	if !util.IsOfficialTelegramAPI() {
-		return slices.Collect(slices.Chunk(formats, 10)), nil
-	}
-
 	const multipartLimit = 50 * 1024 * 1024
 
 	var chunks [][]*models.DownloadedFormat
@@ -309,9 +303,6 @@ func inputFileOrID(fileID string, filePath string) (gotgbot.InputFileOrString, *
 	if fileID != "" {
 		return gotgbot.InputFileByID(fileID), nil, nil
 	}
-	if useLocalFilePathUpload() && filePath != "" {
-		return gotgbot.InputFileByID(localUploadPath(filePath)), nil, nil
-	}
 	input, file, err := inputFile(filePath)
 	return input, file, err
 }
@@ -367,7 +358,6 @@ func SendInlineFormats(
 	inputMedia, err := format.Format.GetInputMedia(
 		format.FilePath, format.ThumbnailFilePath,
 		options.Caption, options.IsSpoiler,
-		useLocalFilePathUpload(),
 	)
 	if err != nil {
 		return err
@@ -384,16 +374,4 @@ func SendInlineFormats(
 	}
 
 	return nil
-}
-
-func useLocalFilePathUpload() bool {
-	return !util.IsOfficialTelegramAPI()
-}
-
-func localUploadPath(filePath string) string {
-	absolutePath, err := filepath.Abs(filePath)
-	if err != nil {
-		return filePath
-	}
-	return "file://" + filepath.ToSlash(absolutePath)
 }

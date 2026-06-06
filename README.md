@@ -75,31 +75,6 @@ docker compose logs -f bot
 
 If your user is not in the Docker group, run the Docker commands with `sudo`.
 
-## Faster Telegram Uploads
-
-For heavy YouTube uploads, use the optional local Telegram Bot API server. This
-lets the bot pass downloaded files by local path instead of re-uploading them
-through `api.telegram.org`.
-
-Get `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from
-`https://my.telegram.org/apps`, then add them to `.env`:
-
-```env
-TELEGRAM_API_ID=your-api-id
-TELEGRAM_API_HASH=your-api-hash
-```
-
-Start with the local Bot API override:
-
-```bash
-docker compose -f docker-compose.yaml -f docker-compose.botapi.yaml pull
-docker compose -f docker-compose.yaml -f docker-compose.botapi.yaml up -d --force-recreate
-docker compose -f docker-compose.yaml -f docker-compose.botapi.yaml logs -f bot telegram-bot-api
-```
-
-When this override is used, `BOT_API_URL` is set to
-`http://telegram-bot-api:8081` automatically.
-
 ## Updating
 
 Pull the latest code and container image, then recreate the services:

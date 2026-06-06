@@ -14,7 +14,6 @@ type EnvConfig struct {
 	DBUser     string
 	DBPassword string
 
-	BotAPIURL         string
 	BotToken          string
 	ConcurrentUpdates int
 

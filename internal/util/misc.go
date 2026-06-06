@@ -52,14 +52,6 @@ func ExceedsMaxFileSize(fileSize int64) bool {
 	return fileSize > config.Env.MaxFileSize
 }
 
-func IsOfficialTelegramAPI() bool {
-	parsedURL, err := url.Parse(config.Env.BotAPIURL)
-	if err != nil {
-		return false
-	}
-	return strings.EqualFold(parsedURL.Hostname(), "api.telegram.org")
-}
-
 func ExceedsMaxDuration(duration int32) bool {
 	return duration > int32(config.Env.MaxDuration.Seconds())
 }

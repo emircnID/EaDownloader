@@ -3,7 +3,6 @@ package config
 import (
 	"time"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
@@ -19,7 +18,6 @@ func loadFromEnv() {
 	parseEnvString("DB_USER", &Env.DBUser, false)
 	parseEnvString("DB_PASSWORD", &Env.DBPassword, false)
 	parseEnvString("BOT_TOKEN", &Env.BotToken, true)
-	parseEnvString("BOT_API_URL", &Env.BotAPIURL, false)
 	parseEnvInt("CONCURRENT_UPDATES", &Env.ConcurrentUpdates, false)
 	parseEnvString("DOWNLOADS_DIR", &Env.DownloadsDirectory, false)
 	parseEnvString("PROXY", &Env.Proxy, false)
@@ -50,7 +48,6 @@ func GetDefaultConfig() *EnvConfig {
 		DBName: "eadownloader",
 		DBUser: "eadownloader",
 
-		BotAPIURL:         gotgbot.DefaultAPIURL,
 		ConcurrentUpdates: ext.DefaultMaxRoutines,
 
 		DownloadsDirectory: "downloads",
