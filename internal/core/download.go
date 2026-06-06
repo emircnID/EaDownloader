@@ -148,7 +148,7 @@ func downloadFormat(
 	index int,
 	format *models.MediaFormat,
 ) (*models.DownloadedFormat, error) {
-	if len(format.URL) == 0 && !isCobaltDownload(format) && !isYtDLPDownload(format) {
+	if len(format.URL) == 0 && !isYtDLPDownload(format) {
 		return nil, fmt.Errorf("no URL found for selected format")
 	}
 
@@ -192,12 +192,6 @@ func downloadFormat(
 	// for video and audio, download to file
 	var err error
 	switch {
-	case isCobaltDownload(format):
-		filePath, err = download.DownloadFileWithCobalt(
-			ctx,
-			fileName,
-			format.DownloadSettings,
-		)
 	case isYtDLPDownload(format):
 		ctx.Progress("yt-dlp ile indiriliyor...")
 		filePath, err = download.DownloadFileWithYtDLP(
@@ -358,10 +352,6 @@ func cloneDownloadSettings(settings *models.DownloadSettings) *models.DownloadSe
 
 func skipThumbnail(format *models.MediaFormat) bool {
 	return format.DownloadSettings != nil && format.DownloadSettings.SkipThumbnail
-}
-
-func isCobaltDownload(format *models.MediaFormat) bool {
-	return format.DownloadSettings != nil && format.DownloadSettings.CobaltURL != ""
 }
 
 func isYtDLPDownload(format *models.MediaFormat) bool {

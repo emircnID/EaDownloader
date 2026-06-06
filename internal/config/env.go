@@ -41,7 +41,6 @@ func loadFromEnv() {
 	parseEnvLanguage("DEFAULT_LANGUAGE", &Env.DefaultLanguage, false)
 	parseEnvBool("DEFAULT_DELETE_LINKS", &Env.DefaultDeleteLinks, false)
 	parseEnvBool("AUTOMATIC_LANGUAGE_DETECTION", &Env.AutomaticLanguageDetection, false)
-	parseEnvString("COBALT_API_URL", &Env.CobaltAPIURL, false)
 }
 
 func GetDefaultConfig() *EnvConfig {

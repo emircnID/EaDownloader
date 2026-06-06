@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"eadownloader/internal/extractors/cobalt"
 	"eadownloader/internal/models"
 	"eadownloader/internal/networking"
 	"eadownloader/internal/util/download/chunked"
@@ -150,79 +149,6 @@ func DownloadFileWithYtDLP(
 	}
 
 	return resolvedPath, nil
-}
-
-func DownloadFileWithCobalt(
-	ctx *models.ExtractorContext,
-	fileName string,
-	settings *models.DownloadSettings,
-) (string, error) {
-	settings = ensureDownloadSettings(settings)
-	ctx.Progress("Cobalt ile hazirlaniyor...")
-
-	response, err := cobalt.GetMediaWithOptions(cobalt.Request{
-		URL:                   settings.CobaltURL,
-		VideoQuality:          settings.CobaltQuality,
-		DownloadMode:          cobaltDownloadMode(settings),
-		AudioFormat:           "mp3",
-		AudioBitrate:          "128",
-		FilenameStyle:         "basic",
-		DisableMetadata:       true,
-		AlwaysProxy:           true,
-		LocalProcessing:       "preferred",
-		YoutubeVideoCodec:     "h264",
-		YoutubeVideoContainer: "mp4",
-		YoutubeBetterAudio:    false,
-		YoutubeHLS:            false,
-	})
-	if err == nil {
-		urls := cobaltDownloadURLs(response, settings.CobaltAudio)
-		if len(urls) > 0 {
-			ctx.Progress("Cobalt linki indiriliyor...")
-			directSettings := *settings
-			directSettings.CobaltURL = ""
-			directSettings.CobaltQuality = ""
-			directSettings.CobaltAudio = false
-			directSettings.YtDLPURL = ""
-			directSettings.YtDLPFormat = ""
-			directSettings.YtDLPSort = ""
-			directSettings.YtDLPArgs = ""
-			directSettings.YtDLPAudio = false
-			return DownloadFile(ctx, urls, fileName, &directSettings)
-		}
-		err = fmt.Errorf("cobalt api returned no downloadable url")
-	}
-
-	ctx.Warnf("cobalt download failed, falling back to yt-dlp: %v", err)
-	if settings.YtDLPURL != "" && settings.YtDLPFormat != "" {
-		return DownloadFileWithYtDLP(ctx, fileName, settings)
-	}
-	return "", err
-}
-
-func cobaltDownloadMode(settings *models.DownloadSettings) string {
-	if settings.CobaltAudio {
-		return "audio"
-	}
-	return "auto"
-}
-
-func cobaltDownloadURLs(response *cobalt.Response, audio bool) []string {
-	if response == nil {
-		return nil
-	}
-	if response.URL != "" {
-		return []string{response.URL}
-	}
-	for _, picker := range response.Picker {
-		if picker.URL == "" {
-			continue
-		}
-		if audio || picker.Type != "photo" && picker.Type != "image" {
-			return []string{picker.URL}
-		}
-	}
-	return nil
 }
 
 func ytDLPDownloadArgs(filePath string, settings *models.DownloadSettings) []string {

@@ -43,7 +43,6 @@ type EnvConfig struct {
 	DefaultDeleteLinks     bool
 
 	AutomaticLanguageDetection bool
-	CobaltAPIURL               string
 }
 
 type ExtractorConfig struct {

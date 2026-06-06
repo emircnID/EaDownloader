@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
+	"eadownloader/internal/database"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/google/uuid"
-	"eadownloader/internal/database"
 )
 
 type Media struct {
@@ -275,6 +275,7 @@ func (format *MediaFormat) GetInputMedia(
 	thumbnailFilePath string,
 	messageCaption string,
 	spoiler bool,
+	useLocalFilePath bool,
 ) (gotgbot.InputMedia, error) {
 	if format.FileID != "" {
 		return format.GetInputMediaWithFileID(messageCaption, spoiler)
@@ -282,15 +283,19 @@ func (format *MediaFormat) GetInputMedia(
 
 	_, inputMediaType := format.GetInfo()
 
-	fileObj, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
+	var fileInputMedia gotgbot.InputFileOrString
+	if useLocalFilePath {
+		fileInputMedia = gotgbot.InputFileByID(localUploadPath(filePath))
+	} else {
+		fileObj, err := os.Open(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file: %w", err)
+		}
+		fileInputMedia = gotgbot.InputFileByReader(
+			filepath.Base(filePath),
+			fileObj,
+		)
 	}
-
-	fileInputMedia := gotgbot.InputFileByReader(
-		filepath.Base(filePath),
-		fileObj,
-	)
 
 	var thumbnailFileInputMedia gotgbot.InputFile
 	if thumbnailFilePath != "" {
@@ -344,6 +349,14 @@ func (format *MediaFormat) GetInputMedia(
 	default:
 		return nil, fmt.Errorf("unknown input type: %s", inputMediaType)
 	}
+}
+
+func localUploadPath(filePath string) string {
+	absolutePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return filePath
+	}
+	return absolutePath
 }
 
 func (format *MediaFormat) GetInputMediaWithFileID(

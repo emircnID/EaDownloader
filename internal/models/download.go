@@ -11,9 +11,6 @@ type DownloadSettings struct {
 	Retries        int
 	SkipRemux      bool
 	SkipThumbnail  bool
-	CobaltURL      string
-	CobaltQuality  string
-	CobaltAudio    bool
 	YtDLPURL       string
 	YtDLPFormat    string
 	YtDLPSort      string

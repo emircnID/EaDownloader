@@ -17,8 +17,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      cobalt-api:
-        condition: service_started
 
   db:
     image: postgres:17-alpine
@@ -37,16 +35,6 @@ services:
       interval: 3s
       timeout: 5s
       retries: 30
-
-  cobalt-api:
-    image: ghcr.io/imputnet/cobalt:10
-    container_name: eadownloader-cobalt-api
-    restart: unless-stopped
-    init: true
-    environment:
-      API_PORT: 9000
-    networks:
-      - eadownloader-network
 
 volumes:
   db:

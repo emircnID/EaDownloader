@@ -57,12 +57,12 @@ func BuildFastMedia(ctx *models.ExtractorContext) *models.Media {
 
 	item := media.NewItem()
 	for _, target := range qualityTargets {
-		item.AddFormats(cobaltVideoMediaFormat(ctx.ContentURL, fmt.Sprintf("%d", target), target))
+		item.AddFormats(fastVideoMediaFormat(ctx.ContentURL, fmt.Sprintf("%d", target), target))
 	}
-	item.AddFormats(cobaltAudioMediaFormat(ctx.ContentURL))
+	item.AddFormats(fastAudioMediaFormat(ctx.ContentURL))
 
 	if IsShortsURL(ctx.ContentURL) {
-		item.AddFormats(cobaltVideoMediaFormat(ctx.ContentURL, formatBest, 1080))
+		item.AddFormats(fastVideoMediaFormat(ctx.ContentURL, formatBest, 1080))
 	}
 
 	return media
@@ -385,7 +385,7 @@ func videoMediaFormatWithID(info *Info, format *Format, formatID string) *models
 	}
 }
 
-func cobaltVideoMediaFormat(contentURL string, formatID string, target int32) *models.MediaFormat {
+func fastVideoMediaFormat(contentURL string, formatID string, target int32) *models.MediaFormat {
 	return &models.MediaFormat{
 		FormatID:         formatID,
 		Type:             database.MediaTypeVideo,
@@ -398,7 +398,7 @@ func cobaltVideoMediaFormat(contentURL string, formatID string, target int32) *m
 	}
 }
 
-func cobaltAudioMediaFormat(contentURL string) *models.MediaFormat {
+func fastAudioMediaFormat(contentURL string) *models.MediaFormat {
 	return &models.MediaFormat{
 		FormatID:         formatMP3,
 		Type:             database.MediaTypeAudio,
@@ -450,17 +450,12 @@ func youtubeVideoDownloadSettings(contentURL string, formatID string) *models.Do
 		target = 1080
 	}
 	settings := youtubeDownloadSettings(contentURL, youtubeVideoSelector(target))
-	settings.CobaltURL = contentURL
-	settings.CobaltQuality = fmt.Sprintf("%d", target)
 	settings.YtDLPSort = youtubeVideoSort(target)
 	return settings
 }
 
 func youtubeAudioDownloadSettings(contentURL string) *models.DownloadSettings {
 	settings := youtubeDownloadSettings(contentURL, "bestaudio/best")
-	settings.CobaltURL = contentURL
-	settings.CobaltQuality = "1080"
-	settings.CobaltAudio = true
 	settings.YtDLPAudio = true
 	return settings
 }
