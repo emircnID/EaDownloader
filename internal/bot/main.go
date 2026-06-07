@@ -77,17 +77,6 @@ func createBot() *gotgbot.Bot {
 }
 
 func configureBotCommands(bot *gotgbot.Bot) {
-	commands := []gotgbot.BotCommand{
-		{Command: "start", Description: "Botu başlat"},
-		{Command: "settings", Description: "Ayarları düzenle"},
-		{Command: "extractors", Description: "Desteklenen platformları göster"},
-		{Command: "admin", Description: "Yönetim paneli"},
-	}
-	if _, err := bot.SetMyCommands(commands, &gotgbot.SetMyCommandsOpts{
-		LanguageCode: "tr",
-	}); err != nil {
-		logger.L.Warnf("failed to set Turkish bot commands: %v", err)
-	}
 	if _, err := bot.SetMyCommands([]gotgbot.BotCommand{
 		{Command: "start", Description: "Start the bot"},
 		{Command: "settings", Description: "Edit settings"},
