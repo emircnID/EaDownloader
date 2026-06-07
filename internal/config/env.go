@@ -58,7 +58,7 @@ func GetDefaultConfig() *EnvConfig {
 		LogLevel:    zap.InfoLevel,
 		Caching:     true,
 
-		CaptionsHeader:      "<a href='{{url}}'>source</a> - @{{username}}",
+		CaptionsHeader:      "<a href='{{url}}'>Source</a> - @{{username}}",
 		CaptionsDescription: "<blockquote expandable>{{text}}</blockquote>",
 
 		DefaultCaptions:        true,

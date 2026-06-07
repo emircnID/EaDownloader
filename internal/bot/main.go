@@ -30,6 +30,7 @@ var allowedUpdates = []string{
 
 func Start() {
 	bot := createBot()
+	configureBotCommands(bot)
 	dispatcher := newDispatcher()
 
 	// prometheus monitoring
@@ -73,6 +74,28 @@ func createBot() *gotgbot.Bot {
 	}
 	logger.L.Fatalf("failed to create bot: %v", err)
 	return nil
+}
+
+func configureBotCommands(bot *gotgbot.Bot) {
+	commands := []gotgbot.BotCommand{
+		{Command: "start", Description: "Botu başlat"},
+		{Command: "settings", Description: "Ayarları düzenle"},
+		{Command: "extractors", Description: "Desteklenen platformları göster"},
+		{Command: "admin", Description: "Yönetim paneli"},
+	}
+	if _, err := bot.SetMyCommands(commands, &gotgbot.SetMyCommandsOpts{
+		LanguageCode: "tr",
+	}); err != nil {
+		logger.L.Warnf("failed to set Turkish bot commands: %v", err)
+	}
+	if _, err := bot.SetMyCommands([]gotgbot.BotCommand{
+		{Command: "start", Description: "Start the bot"},
+		{Command: "settings", Description: "Edit settings"},
+		{Command: "extractors", Description: "Show supported platforms"},
+		{Command: "admin", Description: "Admin panel"},
+	}, nil); err != nil {
+		logger.L.Warnf("failed to set default bot commands: %v", err)
+	}
 }
 
 func newDispatcher() *ext.Dispatcher {
@@ -146,6 +169,10 @@ func registerHandlers(dispatcher *ext.Dispatcher) *ext.Dispatcher {
 	))
 
 	// extractors
+	dispatcher.AddHandler(handlers.NewCommand(
+		"extractors",
+		botHandlers.ExtractorsHandler,
+	))
 	dispatcher.AddHandler(handlers.NewCallback(
 		callbackquery.Equal("extractors"),
 		botHandlers.ExtractorsHandler,

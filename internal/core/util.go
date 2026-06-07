@@ -96,11 +96,17 @@ func formatCaption(media *models.Media, username string, isEnabled bool) string 
 		return textutil.SanitizeTelegramText(s)
 	}
 	var description string
-	header := formatText(config.Env.CaptionsHeader)
+	header := normalizeSourceLabel(formatText(config.Env.CaptionsHeader))
 	if isEnabled && caption != "" {
 		description = formatText(config.Env.CaptionsDescription)
 	}
 	return textutil.SanitizeTelegramText(header + "\n" + description)
+}
+
+func normalizeSourceLabel(text string) string {
+	text = strings.ReplaceAll(text, ">source</a>", ">Source</a>")
+	text = strings.ReplaceAll(text, ">kaynak</a>", ">Kaynak</a>")
+	return text
 }
 
 // utility function to merge audio into video formats with no audio

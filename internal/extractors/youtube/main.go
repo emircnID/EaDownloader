@@ -3,6 +3,9 @@ package youtube
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +21,8 @@ import (
 )
 
 const (
+	youtubeFallbackTitle = "YouTube"
+
 	formatBest = "best"
 	format360  = "360"
 	format720  = "720"
@@ -53,7 +58,7 @@ func BuildFastMedia(ctx *models.ExtractorContext) *models.Media {
 	media := ctx.NewMedia()
 	media.ContentID = ctx.ContentID
 	media.ContentURL = ctx.ContentURL
-	media.SetCaption("YouTube")
+	media.SetCaption(fetchOEmbedTitle(ctx))
 
 	item := media.NewItem()
 	for _, target := range qualityTargets {
@@ -66,6 +71,47 @@ func BuildFastMedia(ctx *models.ExtractorContext) *models.Media {
 	}
 
 	return media
+}
+
+type oEmbedResponse struct {
+	Title string `json:"title"`
+}
+
+func fetchOEmbedTitle(ctx *models.ExtractorContext) string {
+	apiURL := "https://www.youtube.com/oembed?format=json&url=" + url.QueryEscape(ctx.ContentURL)
+	resp, err := ctx.Fetch(
+		http.MethodGet,
+		apiURL,
+		nil,
+	)
+	if err != nil {
+		ctx.Warnf("failed to fetch youtube oembed title: %v", err)
+		return youtubeFallbackTitle
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		ctx.Warnf("failed to fetch youtube oembed title: %s", resp.Status)
+		return youtubeFallbackTitle
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		ctx.Warnf("failed to read youtube oembed title: %v", err)
+		return youtubeFallbackTitle
+	}
+
+	var data oEmbedResponse
+	if err := sonic.ConfigFastest.Unmarshal(body, &data); err != nil {
+		ctx.Warnf("failed to parse youtube oembed title: %v", err)
+		return youtubeFallbackTitle
+	}
+
+	title := strings.TrimSpace(data.Title)
+	if title == "" {
+		return youtubeFallbackTitle
+	}
+	return title
 }
 
 func FetchInfo(ctx *models.ExtractorContext) (*Info, error) {
