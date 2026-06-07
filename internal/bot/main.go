@@ -81,6 +81,9 @@ func configureBotCommands(bot *gotgbot.Bot) {
 		{Command: "start", Description: "Start the bot"},
 		{Command: "settings", Description: "Edit settings"},
 		{Command: "admin", Description: "Admin panel"},
+		{Command: "ban", Description: "Ban a user"},
+		{Command: "unban", Description: "Unban a user"},
+		{Command: "silent", Description: "Temporarily silence a user"},
 	}, nil); err != nil {
 		logger.L.Warnf("failed to set default bot commands: %v", err)
 	}
@@ -209,6 +212,18 @@ func registerHandlers(dispatcher *ext.Dispatcher) *ext.Dispatcher {
 	dispatcher.AddHandler(handlers.NewCommand(
 		"admin",
 		botHandlers.AdminHandler,
+	))
+	dispatcher.AddHandler(handlers.NewCommand(
+		"ban",
+		botHandlers.BanCommandHandler,
+	))
+	dispatcher.AddHandler(handlers.NewCommand(
+		"unban",
+		botHandlers.UnbanCommandHandler,
+	))
+	dispatcher.AddHandler(handlers.NewCommand(
+		"silent",
+		botHandlers.SilentCommandHandler,
 	))
 	dispatcher.AddHandler(handlers.NewCallback(
 		callbackquery.Prefix("admin:"),

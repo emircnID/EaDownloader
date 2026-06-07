@@ -63,3 +63,20 @@ FROM chat c
 JOIN settings s USING (chat_id)
 WHERE c.chat_id = @chat_id
 LIMIT 1;
+
+-- name: GetPrivateChatByUsername :one
+SELECT
+    c.chat_id,
+    c.type,
+    c.title,
+    c.username,
+    c.first_name,
+    c.last_name,
+    s.language,
+    c.created_at,
+    c.last_seen_at
+FROM chat c
+JOIN settings s USING (chat_id)
+WHERE c.type = 'private'
+  AND LOWER(c.username) = LOWER(@username)
+LIMIT 1;

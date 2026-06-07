@@ -219,9 +219,9 @@ func formatChatList(chatType database.ChatType) (string, error) {
 	message := fmt.Sprintf("<b>%s</b>\nSon aktif %d kayıt\n\n", title, len(chats))
 	for i, chat := range chats {
 		message += fmt.Sprintf(
-			"<b>%d. %s</b>\nID: <code>%d</code>\nDil: %s\nSon görülme: %s\n\n",
+			"<b>%d.</b> %s\nID: <code>%d</code>\nDil: %s\nSon görülme: %s\n\n",
 			i+1,
-			formatChatDisplayName(chat),
+			formatAdminChatDisplayName(chat),
 			chat.ChatID,
 			html.EscapeString(chat.Language),
 			formatTimeAgo(chat.LastSeenAt),
@@ -247,7 +247,7 @@ func formatRecentChatLines(chatType database.ChatType, limit int32) ([]string, e
 		lines = append(lines, fmt.Sprintf(
 			"%d. %s · %s",
 			index+1,
-			formatChatDisplayName(chat),
+			formatAdminChatDisplayName(chat),
 			formatTimeAgo(chat.LastSeenAt),
 		))
 	}

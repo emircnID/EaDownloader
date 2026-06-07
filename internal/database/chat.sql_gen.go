@@ -57,6 +57,53 @@ func (q *Queries) GetChatByID(ctx context.Context, chatID int64) (GetChatByIDRow
 	return i, err
 }
 
+const getPrivateChatByUsername = `-- name: GetPrivateChatByUsername :one
+SELECT
+    c.chat_id,
+    c.type,
+    c.title,
+    c.username,
+    c.first_name,
+    c.last_name,
+    s.language,
+    c.created_at,
+    c.last_seen_at
+FROM chat c
+JOIN settings s USING (chat_id)
+WHERE c.type = 'private'
+  AND LOWER(c.username) = LOWER($1)
+LIMIT 1
+`
+
+type GetPrivateChatByUsernameRow struct {
+	ChatID     int64
+	Type       ChatType
+	Title      string
+	Username   string
+	FirstName  string
+	LastName   string
+	Language   string
+	CreatedAt  pgtype.Timestamptz
+	LastSeenAt pgtype.Timestamptz
+}
+
+func (q *Queries) GetPrivateChatByUsername(ctx context.Context, username string) (GetPrivateChatByUsernameRow, error) {
+	row := q.db.QueryRow(ctx, getPrivateChatByUsername, username)
+	var i GetPrivateChatByUsernameRow
+	err := row.Scan(
+		&i.ChatID,
+		&i.Type,
+		&i.Title,
+		&i.Username,
+		&i.FirstName,
+		&i.LastName,
+		&i.Language,
+		&i.CreatedAt,
+		&i.LastSeenAt,
+	)
+	return i, err
+}
+
 const getOrCreateChat = `-- name: GetOrCreateChat :one
 WITH upsert_chat AS (
     INSERT INTO chat (chat_id, type, title, username, first_name, last_name, last_seen_at)
