@@ -80,7 +80,6 @@ func configureBotCommands(bot *gotgbot.Bot) {
 	if _, err := bot.SetMyCommands([]gotgbot.BotCommand{
 		{Command: "start", Description: "Start the bot"},
 		{Command: "settings", Description: "Edit settings"},
-		{Command: "extractors", Description: "Show supported platforms"},
 		{Command: "admin", Description: "Admin panel"},
 	}, nil); err != nil {
 		logger.L.Warnf("failed to set default bot commands: %v", err)
@@ -157,11 +156,6 @@ func registerHandlers(dispatcher *ext.Dispatcher) *ext.Dispatcher {
 		botHandlers.StartHandler,
 	))
 
-	// extractors
-	dispatcher.AddHandler(handlers.NewCommand(
-		"extractors",
-		botHandlers.ExtractorsHandler,
-	))
 	dispatcher.AddHandler(handlers.NewCallback(
 		callbackquery.Equal("extractors"),
 		botHandlers.ExtractorsHandler,

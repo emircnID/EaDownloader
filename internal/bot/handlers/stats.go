@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	statsListLimit int32 = 10
+	statsListLimit       int32 = 10
+	statsRecentListLimit int32 = 3
 
 	statsScreenSummary   = "summary"
 	statsScreenUsers     = "users"
@@ -170,15 +171,36 @@ func formatStatsSummary(period string) (string, error) {
 		}
 	}
 
+	recentUsers, err := formatRecentChatLines(database.ChatTypePrivate, statsRecentListLimit)
+	if err != nil {
+		return "", err
+	}
+	if len(recentUsers) > 0 {
+		message += "\n<b>👤 Son Özel Kullanıcılar</b>\n" + strings.Join(recentUsers, "\n") + "\n"
+	}
+
+	recentGroups, err := formatRecentChatLines(database.ChatTypeGroup, statsRecentListLimit)
+	if err != nil {
+		return "", err
+	}
+	if len(recentGroups) > 0 {
+		message += "\n<b>👥 Son Gruplar</b>\n" + strings.Join(recentGroups, "\n") + "\n"
+	}
+
 	return message, nil
 }
 
 func formatChatList(chatType database.ChatType) (string, error) {
+	limit := statsListLimit
+	if chatType == database.ChatTypePrivate {
+		limit = statsRecentListLimit
+	}
+
 	chats, err := database.Q().ListChatsByType(
 		context.Background(),
 		database.ListChatsByTypeParams{
 			Type:       chatType,
-			LimitCount: statsListLimit,
+			LimitCount: limit,
 		},
 	)
 	if err != nil {
@@ -206,6 +228,30 @@ func formatChatList(chatType database.ChatType) (string, error) {
 		)
 	}
 	return strings.TrimSpace(message), nil
+}
+
+func formatRecentChatLines(chatType database.ChatType, limit int32) ([]string, error) {
+	chats, err := database.Q().ListChatsByType(
+		context.Background(),
+		database.ListChatsByTypeParams{
+			Type:       chatType,
+			LimitCount: limit,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := make([]string, 0, len(chats))
+	for index, chat := range chats {
+		lines = append(lines, fmt.Sprintf(
+			"%d. %s · %s",
+			index+1,
+			formatChatDisplayName(chat),
+			formatTimeAgo(chat.LastSeenAt),
+		))
+	}
+	return lines, nil
 }
 
 func formatPlatformStats(period string) (string, error) {
@@ -268,6 +314,10 @@ func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup
 			statsPeriodButton("7d", "7d", screen),
 			statsPeriodButton("30d", "30d", screen),
 			statsPeriodButton("all", "all", screen),
+		},
+		{
+			{Text: "👤 Kullanıcılar", CallbackData: statsCallbackPrefix + statsScreenUsers},
+			{Text: "👥 Gruplar", CallbackData: statsCallbackPrefix + statsScreenGroups},
 		},
 		{
 			{Text: "🧩 Platformlar", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},

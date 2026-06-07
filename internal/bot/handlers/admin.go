@@ -24,12 +24,15 @@ const (
 	adminScreenModeration = "moderation"
 	adminScreenSystem     = "system"
 	adminScreenUsers      = "users"
+	adminScreenGroups     = "groups"
 	adminScreenBans       = "bans"
 	adminScreenUser       = "user"
 
 	adminActionBanConfirm = "ban_confirm"
 	adminActionBan        = "ban"
 	adminActionUnban      = "unban"
+
+	adminRecentUserLimit int32 = 3
 )
 
 func AdminHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
@@ -85,6 +88,8 @@ func resolveAdminCallback(ctx *ext.Context) (string, gotgbot.InlineKeyboardMarku
 		return buildModerationHome()
 	case data == adminScreenUsers:
 		return buildUserList()
+	case data == adminScreenGroups:
+		return buildGroupList()
 	case data == adminScreenBans:
 		return buildBannedUserList()
 	case data == adminScreenSystem:
@@ -141,8 +146,8 @@ func buildAdminHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 				{Text: "🛡 Moderasyon", CallbackData: adminCallbackPrefix + adminScreenModeration},
 			},
 			{
+				{Text: "👥 Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroups},
 				{Text: "🖥 Sistem", CallbackData: adminCallbackPrefix + adminScreenSystem},
-				{Text: "✖️ Kapat", CallbackData: "close"},
 			},
 		},
 	}, nil
@@ -190,7 +195,6 @@ func buildModerationHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 			},
 			{
 				{Text: "⬅️ Geri", CallbackData: adminCallbackPrefix + adminScreenHome},
-				{Text: "✖️ Kapat", CallbackData: "close"},
 			},
 		},
 	}, nil
@@ -201,7 +205,7 @@ func buildUserList() (string, gotgbot.InlineKeyboardMarkup, error) {
 		context.Background(),
 		database.ListChatsByTypeParams{
 			Type:       database.ChatTypePrivate,
-			LimitCount: statsListLimit,
+			LimitCount: adminRecentUserLimit,
 		},
 	)
 	if err != nil {
@@ -229,6 +233,37 @@ func buildUserList() (string, gotgbot.InlineKeyboardMarkup, error) {
 	}
 
 	return strings.TrimSpace(text), userListKeyboard(rows), nil
+}
+
+func buildGroupList() (string, gotgbot.InlineKeyboardMarkup, error) {
+	rows, err := database.Q().ListChatsByType(
+		context.Background(),
+		database.ListChatsByTypeParams{
+			Type:       database.ChatTypeGroup,
+			LimitCount: statsListLimit,
+		},
+	)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+
+	if len(rows) == 0 {
+		return "<b>👥 Gruplar</b>\n\nHenüz kayıtlı grup yok.", adminBackKeyboard(adminScreenHome), nil
+	}
+
+	text := fmt.Sprintf("<b>👥 Gruplar</b>\nSon aktif %d grup\n\n", len(rows))
+	for index, row := range rows {
+		text += fmt.Sprintf(
+			"<b>%d.</b> %s\n<code>%d</code> · dil: %s · %s\n\n",
+			index+1,
+			formatChatDisplayName(row),
+			row.ChatID,
+			html.EscapeString(row.Language),
+			formatTimeAgo(row.LastSeenAt),
+		)
+	}
+
+	return strings.TrimSpace(text), adminBackKeyboard(adminScreenHome), nil
 }
 
 func buildBannedUserList() (string, gotgbot.InlineKeyboardMarkup, error) {
@@ -341,7 +376,6 @@ func buildBanConfirm(value string) (string, gotgbot.InlineKeyboardMarkup, error)
 			},
 			{
 				{Text: "⬅️ Geri", CallbackData: adminCallbackPrefix + adminScreenUser + ":" + strconv.FormatInt(userID, 10)},
-				{Text: "✖️ Kapat", CallbackData: "close"},
 			},
 		},
 	}, nil
@@ -482,7 +516,6 @@ func adminBackKeyboard(screen string) gotgbot.InlineKeyboardMarkup {
 func adminBackRow(screen string) []gotgbot.InlineKeyboardButton {
 	return []gotgbot.InlineKeyboardButton{
 		{Text: "⬅️ Geri", CallbackData: adminCallbackPrefix + screen},
-		{Text: "✖️ Kapat", CallbackData: "close"},
 	}
 }
 
