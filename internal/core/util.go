@@ -10,6 +10,7 @@ import (
 	"eadownloader/internal/database"
 	"eadownloader/internal/models"
 	"eadownloader/internal/plugins"
+	"eadownloader/internal/textutil"
 	"eadownloader/internal/util"
 	"eadownloader/internal/util/download"
 	"eadownloader/internal/util/libav"
@@ -87,22 +88,19 @@ func insertVideoInfo(format *models.MediaFormat, filePath string) {
 }
 
 func formatCaption(media *models.Media, username string, isEnabled bool) string {
-	caption := media.Caption
-	if len(caption) > 600 {
-		caption = caption[:600] + "..."
-	}
+	caption := textutil.TruncateTelegramText(media.Caption, 600)
 	formatText := func(s string) string {
 		s = strings.ReplaceAll(s, "{{username}}", username)
 		s = strings.ReplaceAll(s, "{{url}}", media.ContentURL)
 		s = strings.ReplaceAll(s, "{{text}}", util.Unquote(caption))
-		return s
+		return textutil.SanitizeTelegramText(s)
 	}
 	var description string
 	header := formatText(config.Env.CaptionsHeader)
 	if isEnabled && caption != "" {
 		description = formatText(config.Env.CaptionsDescription)
 	}
-	return header + "\n" + description
+	return textutil.SanitizeTelegramText(header + "\n" + description)
 }
 
 // utility function to merge audio into video formats with no audio

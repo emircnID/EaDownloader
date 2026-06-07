@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"eadownloader/internal/database"
+	"eadownloader/internal/textutil"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/google/uuid"
 )
@@ -34,7 +35,7 @@ func (m *Media) SetCaption(caption string) {
 	if m.Caption != "" {
 		return
 	}
-	m.Caption = caption
+	m.Caption = textutil.SanitizeTelegramText(caption)
 }
 
 func (m *Media) SetNSFW() {
@@ -276,6 +277,10 @@ func (format *MediaFormat) GetInputMedia(
 	messageCaption string,
 	spoiler bool,
 ) (gotgbot.InputMedia, error) {
+	messageCaption = textutil.SanitizeTelegramText(messageCaption)
+	format.Title = textutil.SanitizeTelegramText(format.Title)
+	format.Artist = textutil.SanitizeTelegramText(format.Artist)
+
 	if format.FileID != "" {
 		return format.GetInputMediaWithFileID(messageCaption, spoiler)
 	}
@@ -350,6 +355,10 @@ func (format *MediaFormat) GetInputMediaWithFileID(
 	messageCaption string,
 	spoiler bool,
 ) (gotgbot.InputMedia, error) {
+	messageCaption = textutil.SanitizeTelegramText(messageCaption)
+	format.Title = textutil.SanitizeTelegramText(format.Title)
+	format.Artist = textutil.SanitizeTelegramText(format.Artist)
+
 	_, inputMediaType := format.GetInfo()
 
 	fileInputMedia := gotgbot.InputFileByID(format.FileID)

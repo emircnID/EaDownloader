@@ -8,6 +8,7 @@ import (
 	"eadownloader/internal/config"
 	"eadownloader/internal/database"
 	"eadownloader/internal/models"
+	"eadownloader/internal/textutil"
 	"eadownloader/internal/util"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -21,6 +22,10 @@ func SendFormats(
 	formats []*models.DownloadedFormat,
 	options *models.SendFormatsOptions,
 ) ([]gotgbot.Message, error) {
+	if options != nil {
+		options.Caption = textutil.SanitizeTelegramText(options.Caption)
+	}
+
 	var chatID int64
 	var messageOptions *gotgbot.SendMediaGroupOpts
 
@@ -236,6 +241,10 @@ func sendSingleFormat(
 	spoiler bool,
 	messageOptions *gotgbot.SendMediaGroupOpts,
 ) (*gotgbot.Message, error) {
+	caption = textutil.SanitizeTelegramText(caption)
+	format.Format.Title = textutil.SanitizeTelegramText(format.Format.Title)
+	format.Format.Artist = textutil.SanitizeTelegramText(format.Format.Artist)
+
 	media, mediaFile, err := inputFileOrID(format.Format.FileID, format.FilePath)
 	if err != nil {
 		return nil, err
