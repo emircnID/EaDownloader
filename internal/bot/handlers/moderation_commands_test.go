@@ -3,6 +3,8 @@ package handlers
 import (
 	"testing"
 
+	"eadownloader/internal/config"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
@@ -59,5 +61,45 @@ func TestParseUserIDTarget(t *testing.T) {
 				t.Fatalf("expected user ID %d, got %d", tt.want, got)
 			}
 		})
+	}
+}
+
+func TestIsModerationAdminAllowsAdminsInGroups(t *testing.T) {
+	previousAdmins := config.Env.Admins
+	config.Env.Admins = []int64{12345}
+	t.Cleanup(func() {
+		config.Env.Admins = previousAdmins
+	})
+
+	ctx := &ext.Context{
+		EffectiveChat: &gotgbot.Chat{Type: gotgbot.ChatTypeSupergroup},
+		EffectiveUser: &gotgbot.User{Id: 12345},
+		EffectiveMessage: &gotgbot.Message{
+			From: &gotgbot.User{Id: 12345},
+		},
+	}
+
+	if !isModerationAdmin(ctx) {
+		t.Fatal("expected configured admin to be allowed in group")
+	}
+}
+
+func TestIsModerationAdminRejectsNonAdmins(t *testing.T) {
+	previousAdmins := config.Env.Admins
+	config.Env.Admins = []int64{12345}
+	t.Cleanup(func() {
+		config.Env.Admins = previousAdmins
+	})
+
+	ctx := &ext.Context{
+		EffectiveChat: &gotgbot.Chat{Type: gotgbot.ChatTypeSupergroup},
+		EffectiveUser: &gotgbot.User{Id: 67890},
+		EffectiveMessage: &gotgbot.Message{
+			From: &gotgbot.User{Id: 67890},
+		},
+	}
+
+	if isModerationAdmin(ctx) {
+		t.Fatal("expected non-admin to be rejected")
 	}
 }

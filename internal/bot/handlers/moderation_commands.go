@@ -20,7 +20,7 @@ import (
 )
 
 func BanCommandHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
-	if !util.IsBotAdmin(ctx) {
+	if !isModerationAdmin(ctx) {
 		return ext.EndGroups
 	}
 
@@ -48,7 +48,7 @@ func BanCommandHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func UnbanCommandHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
-	if !util.IsBotAdmin(ctx) {
+	if !isModerationAdmin(ctx) {
 		return ext.EndGroups
 	}
 
@@ -68,7 +68,7 @@ func UnbanCommandHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func SilentCommandHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
-	if !util.IsBotAdmin(ctx) {
+	if !isModerationAdmin(ctx) {
 		return ext.EndGroups
 	}
 
@@ -105,6 +105,19 @@ func SilentCommandHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		ctx,
 		fmt.Sprintf("🔇 <b>%s</b> susturuldu.\nID: <code>%d</code>\nSüre: <b>%s</b>", html.EscapeString(label), userID, formatCommandDuration(duration)),
 	)
+}
+
+func isModerationAdmin(ctx *ext.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	if ctx.EffectiveUser != nil {
+		return util.IsAdminID(ctx.EffectiveUser.Id)
+	}
+	if ctx.EffectiveMessage != nil && ctx.EffectiveMessage.From != nil {
+		return util.IsAdminID(ctx.EffectiveMessage.From.Id)
+	}
+	return false
 }
 
 func commandArgs(ctx *ext.Context) []string {
