@@ -168,6 +168,9 @@ func resolveModerationTarget(ctx *ext.Context, args []string, startIndex int) (i
 	}
 
 	if user, ok := textMentionModerationTarget(ctx); ok {
+		if user.IsBot {
+			return 0, "", errors.New("botlar moderasyon işlemine tabi tutulamaz")
+		}
 		if _, err := util.PrivateChatFromUser(user); err != nil {
 			return 0, "", err
 		}
@@ -178,6 +181,9 @@ func resolveModerationTarget(ctx *ext.Context, args []string, startIndex int) (i
 		ctx.EffectiveMessage.ReplyToMessage != nil &&
 		ctx.EffectiveMessage.ReplyToMessage.From != nil {
 		user := ctx.EffectiveMessage.ReplyToMessage.From
+		if user.IsBot {
+			return 0, "", errors.New("botlar moderasyon işlemine tabi tutulamaz")
+		}
 		if _, err := util.PrivateChatFromUser(user); err != nil {
 			return 0, "", err
 		}

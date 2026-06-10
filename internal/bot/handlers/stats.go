@@ -290,7 +290,7 @@ func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup
 
 func statsHomeRow() []gotgbot.InlineKeyboardButton {
 	return []gotgbot.InlineKeyboardButton{
-		{Text: "🏠 Anamenü", CallbackData: adminCallbackPrefix + adminScreenHome},
+		{Text: "🏠 Ana menü", CallbackData: adminCallbackPrefix + adminScreenHome},
 	}
 }
 func statsPeriodButton(label string, period string, screen string) gotgbot.InlineKeyboardButton {

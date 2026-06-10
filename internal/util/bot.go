@@ -119,6 +119,9 @@ func PrivateChatFromUser(user *gotgbot.User) (*database.GetOrCreateChatRow, erro
 	if user == nil {
 		return nil, fmt.Errorf("user is nil")
 	}
+	if user.IsBot {
+		return nil, fmt.Errorf("cannot register a bot as a private chat user")
+	}
 
 	res, err := database.Q().GetOrCreateChat(
 		context.Background(),

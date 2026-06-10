@@ -1161,7 +1161,7 @@ func buildDbCleanupPanel(statusMessage string) (string, gotgbot.InlineKeyboardMa
 			},
 			{
 				{Text: "⬅️ Sistem Paneli", CallbackData: adminCallbackPrefix + adminScreenSystem},
-				{Text: "🏠 Anamenü", CallbackData: adminCallbackPrefix + adminScreenHome},
+				{Text: "🏠 Ana menü", CallbackData: adminCallbackPrefix + adminScreenHome},
 			},
 		},
 	}
@@ -1402,7 +1402,7 @@ func pageOffset(page int32) int32 {
 
 func adminHomeRow() []gotgbot.InlineKeyboardButton {
 	return []gotgbot.InlineKeyboardButton{
-		{Text: "🏠 Anamenü", CallbackData: adminCallbackPrefix + adminScreenHome},
+		{Text: "🏠 Ana menü", CallbackData: adminCallbackPrefix + adminScreenHome},
 	}
 }
 
