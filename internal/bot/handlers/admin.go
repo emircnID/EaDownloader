@@ -1522,15 +1522,7 @@ func bannedUserDisplayLabel(row database.ListBannedUsersRow) string {
 	return name
 }
 
-func joinValidTexts(values ...pgtype.Text) string {
-	parts := make([]string, 0, len(values))
-	for _, value := range values {
-		if value.Valid && strings.TrimSpace(value.String) != "" {
-			parts = append(parts, strings.TrimSpace(value.String))
-		}
-	}
-	return strings.Join(parts, " ")
-}
+
 
 func formatUsername(username string) string {
 	if strings.TrimSpace(username) == "" {
