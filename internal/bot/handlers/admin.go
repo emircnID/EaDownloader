@@ -227,6 +227,9 @@ func buildModerationHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
+				{Text: "🛡 Moderasyon", CallbackData: adminCallbackPrefix + adminScreenModeration},
+			},
+			{
 				{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
 			},
 			{
@@ -848,7 +851,7 @@ func bannedUserListKeyboard(_ []database.ListBannedUsersRow) gotgbot.InlineKeybo
 		{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
 		{Text: "🔇 Susturulanlar", CallbackData: adminCallbackPrefix + adminScreenMutes},
 	})
-	buttons = append(buttons, adminBackRow(adminScreenModeration))
+	buttons = append(buttons, adminBackRow(adminScreenHome))
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
 }
 
@@ -858,7 +861,7 @@ func mutedUserListKeyboard(_ []database.ListActiveMutedUsersRow) gotgbot.InlineK
 		{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
 		{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
 	})
-	buttons = append(buttons, adminBackRow(adminScreenModeration))
+	buttons = append(buttons, adminBackRow(adminScreenHome))
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
 }
 
@@ -890,7 +893,7 @@ func userProfileKeyboard(userID int64, banned bool, muted bool) gotgbot.InlineKe
 				{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
 				{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
 			},
-			adminBackRow(adminScreenModeration),
+			adminBackRow(adminScreenHome),
 		},
 	}
 }
