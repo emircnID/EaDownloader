@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"html"
-	"strconv"
 	"strings"
 	"time"
 
@@ -282,7 +281,16 @@ func statsHomeRow() []gotgbot.InlineKeyboardButton {
 		{Text: "🏠 Anamenü", CallbackData: adminCallbackPrefix + adminScreenHome},
 	}
 }
-
+func statsPeriodButton(label string, period string, screen string) gotgbot.InlineKeyboardButton {
+	targetScreen := screen
+	if targetScreen != statsScreenPlatforms {
+		targetScreen = statsScreenSummary
+	}
+	return gotgbot.InlineKeyboardButton{
+		Text:         label,
+		CallbackData: statsCallbackPrefix + targetScreen + ":" + period,
+	}
+}
 
 
 func statsPeriod(period string) (time.Time, string) {
