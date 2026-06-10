@@ -167,11 +167,11 @@ func buildAdminHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 	if err != nil {
 		return "", gotgbot.InlineKeyboardMarkup{}, err
 	}
-	bannedUsersCount, err := database.Q().CountBannedChatsByType(context.Background(), database.ChatTypePrivate)
+	bannedCount, err := database.Q().CountBannedUsers(context.Background())
 	if err != nil {
 		return "", gotgbot.InlineKeyboardMarkup{}, err
 	}
-	mutedUsersCount, err := database.Q().CountActiveMutedChatsByType(context.Background(), database.ChatTypePrivate)
+	mutedCount, err := database.Q().CountActiveMutedUsers(context.Background())
 	if err != nil {
 		return "", gotgbot.InlineKeyboardMarkup{}, err
 	}
@@ -183,16 +183,16 @@ func buildAdminHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 			"%s\n"+
 			"%s\n"+
 			"%s\n"+
+			"%s\n"+
 			"%s\n\n"+
-			"💾 Toplam boyut: <b>%s</b>\n"+
-			"🔇 Susturulan: <b>%d</b>\n\n"+
+			"💾 Toplam boyut: <b>%s</b>\n\n"+
 			"Bir bölüm seçin.",
 		metricBar("👤 Kullanıcılar", stats.TotalPrivateChats, max(stats.TotalPrivateChats, stats.TotalGroupChats)),
 		metricBar("👥 Gruplar", stats.TotalGroupChats, max(stats.TotalPrivateChats, stats.TotalGroupChats)),
 		metricBar("📥 İndirmeler", stats.TotalDownloads, stats.TotalDownloads),
-		metricBar("⛔ Banlı", bannedUsersCount, max(stats.TotalPrivateChats, 1)),
+		metricBar("🔇 Susturulan", mutedCount, max(stats.TotalPrivateChats+stats.TotalGroupChats, 1)),
+		metricBar("⛔ Banlı", bannedCount, max(stats.TotalPrivateChats+stats.TotalGroupChats, 1)),
 		formatBytes(stats.TotalDownloadsSize),
-		mutedUsersCount,
 	)
 
 	return text, gotgbot.InlineKeyboardMarkup{
