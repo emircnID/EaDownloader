@@ -20,8 +20,10 @@ func BannedUserHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return ext.ContinueGroups
 	}
 	if user := effectiveUser(ctx); user != nil {
-		if _, err := util.PrivateChatFromUser(user); err != nil {
-			return err
+		if ctx.EffectiveChat != nil && ctx.EffectiveChat.Type == gotgbot.ChatTypePrivate {
+			if _, err := util.PrivateChatFromUser(user); err != nil {
+				return err
+			}
 		}
 	}
 	if util.IsAdminID(userID) {
