@@ -227,7 +227,7 @@ func buildModerationHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
-				{Text: "🛡 Moderasyon", CallbackData: adminCallbackPrefix + adminScreenModeration},
+				{Text: "👥 Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroups},
 			},
 			{
 				{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
@@ -235,9 +235,7 @@ func buildModerationHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 			{
 				{Text: "🔇 Susturulanlar", CallbackData: adminCallbackPrefix + adminScreenMutes},
 			},
-			{
-				{Text: "⬅️ Geri", CallbackData: adminCallbackPrefix + adminScreenHome},
-			},
+			adminHomeRow(),
 		},
 	}, nil
 }
@@ -707,7 +705,7 @@ func buildBanConfirm(value string) (string, gotgbot.InlineKeyboardMarkup, error)
 				{Text: "⛔ Banı Onayla", CallbackData: adminCallbackPrefix + adminActionBan + ":" + strconv.FormatInt(userID, 10)},
 			},
 			{
-				{Text: "⬅️ Geri", CallbackData: adminCallbackPrefix + adminScreenUser + ":" + strconv.FormatInt(userID, 10)},
+				{Text: "👤 Profil", CallbackData: adminCallbackPrefix + adminScreenUser + ":" + strconv.FormatInt(userID, 10)},
 			},
 		},
 	}, nil
@@ -834,14 +832,14 @@ func userListKeyboard(_ []database.ListChatsByTypePageRow, page int32, total int
 		{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
 		{Text: "🔇 Susturulanlar", CallbackData: adminCallbackPrefix + adminScreenMutes},
 	})
-	buttons = append(buttons, adminBackRow(adminScreenHome))
+	buttons = append(buttons, adminHomeRow())
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
 }
 
 func groupListKeyboard(_ []database.ListChatsByTypePageRow, page int32, total int64) gotgbot.InlineKeyboardMarkup {
 	buttons := make([][]gotgbot.InlineKeyboardButton, 0, 2)
 	buttons = append(buttons, adminPaginationRows(adminScreenGroups, page, total)...)
-	buttons = append(buttons, adminBackRow(adminScreenHome))
+	buttons = append(buttons, adminHomeRow())
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
 }
 
@@ -851,7 +849,7 @@ func bannedUserListKeyboard(_ []database.ListBannedUsersRow) gotgbot.InlineKeybo
 		{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
 		{Text: "🔇 Susturulanlar", CallbackData: adminCallbackPrefix + adminScreenMutes},
 	})
-	buttons = append(buttons, adminBackRow(adminScreenHome))
+	buttons = append(buttons, adminHomeRow())
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
 }
 
@@ -861,7 +859,7 @@ func mutedUserListKeyboard(_ []database.ListActiveMutedUsersRow) gotgbot.InlineK
 		{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
 		{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
 	})
-	buttons = append(buttons, adminBackRow(adminScreenHome))
+	buttons = append(buttons, adminHomeRow())
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
 }
 
@@ -893,7 +891,7 @@ func userProfileKeyboard(userID int64, banned bool, muted bool) gotgbot.InlineKe
 				{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
 				{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
 			},
-			adminBackRow(adminScreenHome),
+			adminHomeRow(),
 		},
 	}
 }
@@ -905,15 +903,15 @@ func groupProfileKeyboard() gotgbot.InlineKeyboardMarkup {
 				{Text: "👥 Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroups},
 				{Text: "📊 Analitik", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + statsPeriodAll},
 			},
-			adminBackRow(adminScreenHome),
+			adminHomeRow(),
 		},
 	}
 }
 
-func adminBackKeyboard(screen string) gotgbot.InlineKeyboardMarkup {
+func adminBackKeyboard(_ string) gotgbot.InlineKeyboardMarkup {
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			adminBackRow(screen),
+			adminHomeRow(),
 		},
 	}
 }
@@ -988,9 +986,9 @@ func pageOffset(page int32) int32 {
 	return page * adminPageSize
 }
 
-func adminBackRow(screen string) []gotgbot.InlineKeyboardButton {
+func adminHomeRow() []gotgbot.InlineKeyboardButton {
 	return []gotgbot.InlineKeyboardButton{
-		{Text: "⬅️ Geri", CallbackData: adminCallbackPrefix + screen},
+		{Text: "⚙️ Admin", CallbackData: adminCallbackPrefix + adminScreenHome},
 	}
 }
 
