@@ -166,6 +166,20 @@ type Chat struct {
 	LastSeenAt pgtype.Timestamptz
 }
 
+type DownloadEvents struct {
+	ID            int64
+	ChatID        int64
+	UserID        int64
+	ChatType      ChatType
+	ExtractorID   string
+	ContentID     string
+	ContentUrl    string
+	ItemCount     int32
+	TotalFileSize int64
+	FromCache     bool
+	CreatedAt     pgtype.Timestamptz
+}
+
 type Errors struct {
 	ID          string
 	Message     string

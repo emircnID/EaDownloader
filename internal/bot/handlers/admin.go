@@ -38,7 +38,8 @@ const (
 	adminActionMute       = "mute"
 	adminActionUnmute     = "unmute"
 
-	adminPageSize int32 = 8
+	adminPageSize      int32 = 8
+	adminActivityLimit int32 = 5
 )
 
 func AdminHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
@@ -420,6 +421,25 @@ func buildUserProfile(value string) (string, gotgbot.InlineKeyboardMarkup, error
 		status = "Susturuldu · kalan: " + formatDurationLeft(muteExpiresAt)
 	}
 
+	summary, err := database.Q().GetUserDownloadSummary(context.Background(), user.ChatID)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+	platforms, err := database.Q().ListUserPlatformStats(
+		context.Background(),
+		database.ListUserPlatformStatsParams{UserID: user.ChatID, LimitCount: adminActivityLimit},
+	)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+	recentDownloads, err := database.Q().ListUserRecentDownloadEvents(
+		context.Background(),
+		database.ListUserRecentDownloadEventsParams{UserID: user.ChatID, LimitCount: adminActivityLimit},
+	)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+
 	text := fmt.Sprintf(
 		"<b>👤 Kullanıcı Profili</b>\n\n"+
 			"%s\n"+
@@ -428,7 +448,10 @@ func buildUserProfile(value string) (string, gotgbot.InlineKeyboardMarkup, error
 			"Dil: %s\n"+
 			"Durum: %s\n"+
 			"Kayıt: %s\n"+
-			"Son görülme: %s",
+			"Son görülme: %s\n\n"+
+			"%s\n\n"+
+			"%s\n\n"+
+			"%s",
 		formatUserProfileDisplayName(user),
 		user.ChatID,
 		formatUsername(user.Username),
@@ -436,6 +459,9 @@ func buildUserProfile(value string) (string, gotgbot.InlineKeyboardMarkup, error
 		status,
 		formatTimeAgo(user.CreatedAt),
 		formatTimeAgo(user.LastSeenAt),
+		formatDownloadActivitySummary(summary.Downloads, summary.Items, summary.TotalSize, summary.LastDownloadAt),
+		formatUserPlatformBreakdown(platforms),
+		formatUserRecentDownloadEvents(recentDownloads),
 	)
 
 	return text, userProfileKeyboard(user.ChatID, banned, muted), nil
@@ -452,6 +478,25 @@ func buildGroupProfile(value string) (string, gotgbot.InlineKeyboardMarkup, erro
 		return buildGroupList()
 	}
 
+	summary, err := database.Q().GetChatDownloadSummary(context.Background(), group.ChatID)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+	platforms, err := database.Q().ListChatPlatformStats(
+		context.Background(),
+		database.ListChatPlatformStatsParams{ChatID: group.ChatID, LimitCount: adminActivityLimit},
+	)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+	recentDownloads, err := database.Q().ListChatRecentDownloadEvents(
+		context.Background(),
+		database.ListChatRecentDownloadEventsParams{ChatID: group.ChatID, LimitCount: adminActivityLimit},
+	)
+	if err != nil {
+		return "", gotgbot.InlineKeyboardMarkup{}, err
+	}
+
 	text := fmt.Sprintf(
 		"<b>👥 Grup Detayı</b>\n\n"+
 			"%s\n"+
@@ -459,16 +504,167 @@ func buildGroupProfile(value string) (string, gotgbot.InlineKeyboardMarkup, erro
 			"Kullanıcı adı: %s\n"+
 			"Dil: %s\n"+
 			"Kayıt: %s\n"+
-			"Son aktiflik: %s",
+			"Son aktiflik: %s\n\n"+
+			"%s\n\n"+
+			"%s\n\n"+
+			"%s",
 		formatUserProfileDisplayName(group),
 		group.ChatID,
 		formatUsername(group.Username),
 		html.EscapeString(group.Language),
 		formatTimeAgo(group.CreatedAt),
 		formatTimeAgo(group.LastSeenAt),
+		formatDownloadActivitySummary(summary.Downloads, summary.Items, summary.TotalSize, summary.LastDownloadAt),
+		formatChatPlatformBreakdown(platforms),
+		formatChatRecentDownloadEvents(recentDownloads),
 	)
 
 	return text, groupProfileKeyboard(), nil
+}
+
+func formatDownloadActivitySummary(downloads int64, items int64, totalSize int64, lastDownloadAt pgtype.Timestamptz) string {
+	if downloads == 0 {
+		return "<b>📈 Aktivite</b>\nHenüz indirme kaydı yok. Yeni indirmeler burada birikecek."
+	}
+	return fmt.Sprintf(
+		"<b>📈 Aktivite</b>\n"+
+			"İndirme: <b>%d</b> · Medya: <b>%d</b>\n"+
+			"Toplam boyut: <b>%s</b>\n"+
+			"Son indirme: <b>%s</b>",
+		downloads,
+		items,
+		formatBytes(totalSize),
+		formatTimeAgo(lastDownloadAt),
+	)
+}
+
+func formatUserPlatformBreakdown(rows []database.ListUserPlatformStatsRow) string {
+	if len(rows) == 0 {
+		return "<b>🧩 Platformlar</b>\nKayıt yok."
+	}
+	lines := []string{"<b>🧩 Platformlar</b>"}
+	for _, row := range rows {
+		lines = append(lines, fmt.Sprintf(
+			"%s · <b>%d</b> indirme · %s",
+			html.EscapeString(row.ExtractorID),
+			row.Downloads,
+			formatBytes(row.TotalSize),
+		))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func formatChatPlatformBreakdown(rows []database.ListChatPlatformStatsRow) string {
+	if len(rows) == 0 {
+		return "<b>🧩 Platformlar</b>\nKayıt yok."
+	}
+	lines := []string{"<b>🧩 Platformlar</b>"}
+	for _, row := range rows {
+		lines = append(lines, fmt.Sprintf(
+			"%s · <b>%d</b> indirme · %s",
+			html.EscapeString(row.ExtractorID),
+			row.Downloads,
+			formatBytes(row.TotalSize),
+		))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func formatUserRecentDownloadEvents(rows []database.ListUserRecentDownloadEventsRow) string {
+	if len(rows) == 0 {
+		return "<b>🕘 Son İndirmeler</b>\nKayıt yok."
+	}
+	lines := []string{"<b>🕘 Son İndirmeler</b>"}
+	for index, row := range rows {
+		lines = append(lines, fmt.Sprintf(
+			"%d. %s · %s%s · %d medya · %s · %s%s",
+			index+1,
+			formatDownloadEventLink(row.ContentUrl, row.ContentID),
+			html.EscapeString(row.ExtractorID),
+			formatCacheMarker(row.FromCache),
+			row.ItemCount,
+			formatBytes(row.TotalFileSize),
+			formatTimeAgo(row.CreatedAt),
+			formatEventChatSuffix(row.ChatType, row.ChatID, row.ChatTitle, row.ChatUsername),
+		))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func formatChatRecentDownloadEvents(rows []database.ListChatRecentDownloadEventsRow) string {
+	if len(rows) == 0 {
+		return "<b>🕘 Son İndirmeler</b>\nKayıt yok."
+	}
+	lines := []string{"<b>🕘 Son İndirmeler</b>"}
+	for index, row := range rows {
+		lines = append(lines, fmt.Sprintf(
+			"%d. %s · %s%s · %d medya · %s · %s · %s",
+			index+1,
+			formatEventUserLabel(row.UserID, row.UserUsername, row.UserFirstName, row.UserLastName),
+			html.EscapeString(row.ExtractorID),
+			formatCacheMarker(row.FromCache),
+			row.ItemCount,
+			formatBytes(row.TotalFileSize),
+			formatTimeAgo(row.CreatedAt),
+			formatDownloadEventLink(row.ContentUrl, row.ContentID),
+		))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func formatDownloadEventLink(contentURL string, contentID string) string {
+	label := strings.TrimSpace(contentID)
+	if label == "" {
+		label = "içerik"
+	}
+	label = truncateText(label, 28)
+	if strings.TrimSpace(contentURL) == "" {
+		return "<code>" + label + "</code>"
+	}
+	return fmt.Sprintf("<a href='%s'>%s</a>", html.EscapeString(contentURL), label)
+}
+
+func formatCacheMarker(fromCache bool) string {
+	if !fromCache {
+		return ""
+	}
+	return " · cache"
+}
+
+func formatEventChatSuffix(chatType database.ChatType, chatID int64, title pgtype.Text, username pgtype.Text) string {
+	if chatType == database.ChatTypePrivate {
+		return ""
+	}
+	name := validText(title)
+	if name == "" && username.Valid && strings.TrimSpace(username.String) != "" {
+		name = "@" + strings.TrimSpace(username.String)
+	}
+	if name == "" {
+		name = strconv.FormatInt(chatID, 10)
+	}
+	return " · grup: " + html.EscapeString(name)
+}
+
+func formatEventUserLabel(userID int64, username pgtype.Text, firstName pgtype.Text, lastName pgtype.Text) string {
+	name := strings.TrimSpace(joinValidTexts(firstName, lastName))
+	if name == "" && username.Valid && strings.TrimSpace(username.String) != "" {
+		name = "@" + strings.TrimSpace(username.String)
+	}
+	if name == "" {
+		name = strconv.FormatInt(userID, 10)
+	}
+	return fmt.Sprintf(
+		"<a href='tg://user?id=%d'>%s</a>",
+		userID,
+		html.EscapeString(name),
+	)
+}
+
+func validText(value pgtype.Text) string {
+	if !value.Valid {
+		return ""
+	}
+	return strings.TrimSpace(value.String)
 }
 
 func buildUnknownUserProfile(userID int64) (string, gotgbot.InlineKeyboardMarkup, error) {

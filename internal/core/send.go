@@ -149,7 +149,48 @@ func SendFormats(
 			return nil, fmt.Errorf("failed to cache formats: %w", err)
 		}
 	}
+	if err := recordDownloadEvent(ctx, extractorCtx, media, sentMessages, options.IsStored); err != nil {
+		extractorCtx.Warnf("failed to record download event: %v", err)
+	}
 	return sentMessages, nil
+}
+
+func recordDownloadEvent(
+	ctx *ext.Context,
+	extractorCtx *models.ExtractorContext,
+	media *models.Media,
+	messages []gotgbot.Message,
+	fromCache bool,
+) error {
+	if extractorCtx == nil || extractorCtx.Chat == nil || media == nil {
+		return nil
+	}
+
+	_, fileSizes := collectMessageData(messages)
+	var totalFileSize int64
+	for _, fileSize := range fileSizes {
+		totalFileSize += fileSize
+	}
+
+	userID := extractorCtx.Chat.ChatID
+	if ctx != nil && ctx.EffectiveUser != nil {
+		userID = ctx.EffectiveUser.Id
+	}
+
+	return database.Q().CreateDownloadEvent(
+		extractorCtx.Context,
+		database.CreateDownloadEventParams{
+			ChatID:        extractorCtx.Chat.ChatID,
+			UserID:        userID,
+			ChatType:      extractorCtx.Chat.Type,
+			ExtractorID:   extractorCtx.Extractor.ID,
+			ContentID:     media.ContentID,
+			ContentUrl:    media.ContentURL,
+			ItemCount:     int32(len(messages)),
+			TotalFileSize: totalFileSize,
+			FromCache:     fromCache,
+		},
+	)
 }
 
 func chunkFormatsForUpload(formats []*models.DownloadedFormat) ([][]*models.DownloadedFormat, error) {
