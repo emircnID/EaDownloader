@@ -19,9 +19,10 @@ const (
 	statsListLimit       int32 = 5
 	statsRecentListLimit int32 = 3
 
-	statsScreenSummary   = "summary"
-	statsScreenPlatforms = "platforms"
-	statsScreenErrors    = "errors"
+	statsScreenSummary         = "summary"
+	statsScreenPlatforms       = "platforms"
+	statsScreenErrors          = "errors"
+	statsScreenRecentDownloads = "recent_downloads"
 
 	statsPeriodAll = "all"
 
@@ -103,6 +104,9 @@ func resolveStatsScreen(screen string, period string) (string, string, string, e
 		text, err = formatStatsSummary(period)
 	case statsScreenPlatforms:
 		text, err = formatPlatformStats(period)
+	case statsScreenRecentDownloads:
+		text, err = formatGlobalRecentDownloads()
+		period = statsPeriodAll
 	case statsScreenErrors:
 		text, err = formatRecentErrors()
 		period = statsPeriodAll
@@ -116,7 +120,7 @@ func resolveStatsScreen(screen string, period string) (string, string, string, e
 
 func isStatsScreen(value string) bool {
 	switch value {
-	case statsScreenSummary, statsScreenPlatforms, statsScreenErrors:
+	case statsScreenSummary, statsScreenPlatforms, statsScreenErrors, statsScreenRecentDownloads:
 		return true
 	default:
 		return false
@@ -259,12 +263,20 @@ func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup
 		statsPeriodButton("all", "all", screen),
 	})
 
-	if screen == statsScreenPlatforms {
+	switch screen {
+	case statsScreenSummary:
+		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+			{Text: "🧩 Platformlar", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
+			{Text: "📥 Son İndirmeler", CallbackData: statsCallbackPrefix + statsScreenRecentDownloads + ":" + period},
+		})
+	case statsScreenPlatforms:
 		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
 			{Text: "📊 Özet", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
+			{Text: "📥 Son İndirmeler", CallbackData: statsCallbackPrefix + statsScreenRecentDownloads + ":" + period},
 		})
-	} else {
+	case statsScreenRecentDownloads:
 		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+			{Text: "📊 Özet", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
 			{Text: "🧩 Platformlar", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
 		})
 	}
@@ -283,7 +295,7 @@ func statsHomeRow() []gotgbot.InlineKeyboardButton {
 }
 func statsPeriodButton(label string, period string, screen string) gotgbot.InlineKeyboardButton {
 	targetScreen := screen
-	if targetScreen != statsScreenPlatforms {
+	if targetScreen != statsScreenPlatforms && targetScreen != statsScreenRecentDownloads {
 		targetScreen = statsScreenSummary
 	}
 	return gotgbot.InlineKeyboardButton{
@@ -355,4 +367,120 @@ func truncateText(text string, limit int) string {
 		return text
 	}
 	return text[:limit] + "..."
+}
+
+func formatGlobalRecentDownloads() (string, error) {
+	rows, err := database.Conn().Query(context.Background(), `
+		SELECT 
+			d.extractor_id,
+			d.content_url,
+			d.item_count,
+			d.total_file_size,
+			d.created_at,
+			d.chat_type,
+			COALESCE(c.title, ''),
+			COALESCE(c.username, ''),
+			COALESCE(c.first_name, ''),
+			COALESCE(c.last_name, ''),
+			COALESCE(u.username, ''),
+			COALESCE(u.first_name, ''),
+			COALESCE(u.last_name, '')
+		FROM download_events d
+		LEFT JOIN chat c ON d.chat_id = c.chat_id
+		LEFT JOIN chat u ON d.user_id = u.chat_id
+		ORDER BY d.created_at DESC
+		LIMIT 5
+	`)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	var lines []string
+	count := 0
+	for rows.Next() {
+		count++
+		var (
+			extractorID   string
+			contentURL    string
+			itemCount     int
+			totalFileSize int64
+			createdAt     time.Time
+			chatType      string
+			cTitle        string
+			cUsername     string
+			cFirstName    string
+			cLastName     string
+			uUsername     string
+			uFirstName    string
+			uLastName     string
+		)
+		err = rows.Scan(
+			&extractorID, &contentURL, &itemCount, &totalFileSize, &createdAt, &chatType,
+			&cTitle, &cUsername, &cFirstName, &cLastName,
+			&uUsername, &uFirstName, &uLastName,
+		)
+		if err != nil {
+			return "", err
+		}
+
+		// Format user display name
+		var userDisp string
+		uName := strings.TrimSpace(strings.Join([]string{uFirstName, uLastName}, " "))
+		if uName == "" && uUsername != "" {
+			uName = "@" + uUsername
+		}
+		if uName == "" {
+			userDisp = "Bilinmeyen Kullanıcı"
+		} else {
+			userDisp = html.EscapeString(uName)
+			if uUsername != "" && !strings.Contains(strings.ToLower(uName), strings.ToLower("@"+uUsername)) {
+				userDisp += " @" + html.EscapeString(uUsername)
+			}
+		}
+
+		// Format source chat display name if group
+		var groupDisp string
+		if chatType == "group" {
+			gName := strings.TrimSpace(cTitle)
+			if gName == "" && cUsername != "" {
+				gName = "@" + cUsername
+			}
+			if gName == "" {
+				groupDisp = "Bilinmeyen Grup"
+			} else {
+				groupDisp = html.EscapeString(gName)
+				if cUsername != "" && !strings.Contains(strings.ToLower(gName), strings.ToLower("@"+cUsername)) {
+					groupDisp += " @" + html.EscapeString(cUsername)
+				}
+			}
+		}
+
+		// Format link - truncate if too long
+		displayURL := contentURL
+		if len(displayURL) > 30 {
+			displayURL = displayURL[:27] + "..."
+		}
+
+		platformName := extractorID
+		if len(platformName) > 0 {
+			platformName = strings.ToUpper(platformName[:1]) + platformName[1:]
+		}
+
+		line := fmt.Sprintf("<b>%d. 🧩 %s</b>\n", count, html.EscapeString(platformName))
+		line += fmt.Sprintf("   👤 %s\n", userDisp)
+		if chatType == "group" {
+			line += fmt.Sprintf("   👥 Grup: %s\n", groupDisp)
+		}
+		line += fmt.Sprintf("   🔗 <a href=\"%s\">%s</a>\n", html.EscapeString(contentURL), html.EscapeString(displayURL))
+		line += fmt.Sprintf("   💾 %s · %d adet\n", formatBytes(totalFileSize), itemCount)
+		line += fmt.Sprintf("   ⏱ %s", formatTimestamp(createdAt))
+		lines = append(lines, line)
+	}
+
+	if count == 0 {
+		return "<b>📥 Son İndirilenler</b>\n\nHenüz indirme kaydı yok.", nil
+	}
+
+	return "<b>📥 Son İndirilenler</b>\n\n" + strings.Join(lines, "\n\n"), nil
 }

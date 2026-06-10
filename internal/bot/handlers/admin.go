@@ -1099,7 +1099,6 @@ func buildDbCleanupPanel(statusMessage string) (string, gotgbot.InlineKeyboardMa
 	err := database.Conn().QueryRow(context.Background(), fmt.Sprintf(`
 		SELECT COUNT(*) FROM chat 
 		WHERE type = 'private' 
-		  AND chat_id NOT IN (SELECT chat_id FROM download_events WHERE chat_type = 'private')
 		  AND chat_id NOT IN (SELECT user_id FROM banned_users)
 		  AND chat_id NOT IN (SELECT user_id FROM muted_users)
 		  AND chat_id NOT IN (%s)
@@ -1112,7 +1111,6 @@ func buildDbCleanupPanel(statusMessage string) (string, gotgbot.InlineKeyboardMa
 	err = database.Conn().QueryRow(context.Background(), `
 		SELECT COUNT(*) FROM chat 
 		WHERE type = 'group' 
-		  AND chat_id NOT IN (SELECT chat_id FROM download_events WHERE chat_type = 'group')
 		  AND chat_id NOT IN (SELECT user_id FROM banned_users)
 		  AND chat_id NOT IN (SELECT user_id FROM muted_users)
 	`).Scan(&countGroups)
@@ -1138,8 +1136,8 @@ func buildDbCleanupPanel(statusMessage string) (string, gotgbot.InlineKeyboardMa
 	}
 	text += fmt.Sprintf(
 		"Temizlenebilecek veriler:\n"+
-			"👤 İnaktif kullanıcılar: <b>%d</b>\n"+
-			"👥 İnaktif gruplar: <b>%d</b>\n"+
+			"👤 Kayıtlı kullanıcılar: <b>%d</b>\n"+
+			"👥 Kayıtlı gruplar: <b>%d</b>\n"+
 			"📥 İndirme geçmişi: <b>%d</b> kayıt\n"+
 			"🚨 Hata kayıtları: <b>%d</b> kayıt\n\n"+
 			"Temizlemek istediğiniz kategoriyi seçin.",
@@ -1152,10 +1150,10 @@ func buildDbCleanupPanel(statusMessage string) (string, gotgbot.InlineKeyboardMa
 	keyboard := gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
-				{Text: "👤 İnaktif Kullanıcıları Temizle", CallbackData: adminCallbackPrefix + "db_clean:users"},
+				{Text: "👤 Tüm Kullanıcıları Temizle", CallbackData: adminCallbackPrefix + "db_clean:users"},
 			},
 			{
-				{Text: "👥 İnaktif Grupları Temizle", CallbackData: adminCallbackPrefix + "db_clean:groups"},
+				{Text: "👥 Tüm Grupları Temizle", CallbackData: adminCallbackPrefix + "db_clean:groups"},
 			},
 			{
 				{Text: "📥 İndirme Geçmişini Temizle", CallbackData: adminCallbackPrefix + "db_clean:downloads"},
@@ -1191,7 +1189,6 @@ func handleDbCleanup(bot *gotgbot.Bot, ctx *ext.Context, target string) (string,
 		query := fmt.Sprintf(`
 			DELETE FROM chat 
 			WHERE type = 'private' 
-			  AND chat_id NOT IN (SELECT chat_id FROM download_events WHERE chat_type = 'private')
 			  AND chat_id NOT IN (SELECT user_id FROM banned_users)
 			  AND chat_id NOT IN (SELECT user_id FROM muted_users)
 			  AND chat_id NOT IN (%s)
@@ -1201,14 +1198,13 @@ func handleDbCleanup(bot *gotgbot.Bot, ctx *ext.Context, target string) (string,
 		if err != nil {
 			status = "❌ Hata: " + err.Error()
 		} else {
-			status = fmt.Sprintf("✅ <b>%d</b> inaktif kullanıcı veritabanından temizlendi.", tag.RowsAffected())
+			status = fmt.Sprintf("✅ <b>%d</b> kullanıcı veritabanından temizlendi.", tag.RowsAffected())
 		}
 
 	case "groups":
 		query := `
 			DELETE FROM chat 
 			WHERE type = 'group' 
-			  AND chat_id NOT IN (SELECT chat_id FROM download_events WHERE chat_type = 'group')
 			  AND chat_id NOT IN (SELECT user_id FROM banned_users)
 			  AND chat_id NOT IN (SELECT user_id FROM muted_users)
 		`
@@ -1217,7 +1213,7 @@ func handleDbCleanup(bot *gotgbot.Bot, ctx *ext.Context, target string) (string,
 		if err != nil {
 			status = "❌ Hata: " + err.Error()
 		} else {
-			status = fmt.Sprintf("✅ <b>%d</b> inaktif grup veritabanından temizlendi.", tag.RowsAffected())
+			status = fmt.Sprintf("✅ <b>%d</b> grup veritabanından temizlendi.", tag.RowsAffected())
 		}
 
 	case "downloads":
