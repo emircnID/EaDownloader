@@ -38,7 +38,7 @@ const (
 	adminActionMute       = "mute"
 	adminActionUnmute     = "unmute"
 
-	adminPageSize      int32 = 8
+	adminPageSize      int32 = 5
 	adminActivityLimit int32 = 5
 )
 
@@ -278,11 +278,10 @@ func buildUserList(pageValues ...string) (string, gotgbot.InlineKeyboardMarkup, 
 			status = "Susturuldu: " + formatDurationLeft(activeMute.ExpiresAt.Time)
 		}
 		text += fmt.Sprintf(
-			"<b>%d.</b> %s\n%s · Dil: %s · %s\n\nID : <code>%d</code>.\n\n",
+			"<b>%d.</b> %s\n%s · %s\n\nID : <code>%d</code>\n\n",
 			int(pageOffset(page))+index+1,
 			formatAdminPageChatDisplayName(row),
 			status,
-			html.EscapeString(row.Language),
 			formatTimeAgo(row.LastSeenAt),
 			row.ChatID,
 		)
@@ -324,10 +323,9 @@ func buildGroupList(pageValues ...string) (string, gotgbot.InlineKeyboardMarkup,
 	)
 	for index, row := range rows {
 		text += fmt.Sprintf(
-			"<b>%d.</b> %s\nDil: %s · %s\n\nID : <code>%d</code>.\n\n",
+			"<b>%d.</b> %s\n%s\n\nID : <code>%d</code>\n\n",
 			int(pageOffset(page))+index+1,
 			formatAdminPageChatDisplayName(row),
-			html.EscapeString(row.Language),
 			formatTimeAgo(row.LastSeenAt),
 			row.ChatID,
 		)
@@ -445,7 +443,6 @@ func buildUserProfile(value string) (string, gotgbot.InlineKeyboardMarkup, error
 			"%s\n"+
 			"ID: <code>%d</code>\n"+
 			"Kullanıcı adı: %s\n"+
-			"Dil: %s\n"+
 			"Durum: %s\n"+
 			"Kayıt: %s\n"+
 			"Son görülme: %s\n\n"+
@@ -455,7 +452,6 @@ func buildUserProfile(value string) (string, gotgbot.InlineKeyboardMarkup, error
 		formatUserProfileDisplayName(user),
 		user.ChatID,
 		formatUsername(user.Username),
-		html.EscapeString(user.Language),
 		status,
 		formatTimeAgo(user.CreatedAt),
 		formatTimeAgo(user.LastSeenAt),
@@ -502,7 +498,6 @@ func buildGroupProfile(value string) (string, gotgbot.InlineKeyboardMarkup, erro
 			"%s\n"+
 			"ID: <code>%d</code>\n"+
 			"Kullanıcı adı: %s\n"+
-			"Dil: %s\n"+
 			"Kayıt: %s\n"+
 			"Son aktiflik: %s\n\n"+
 			"%s\n\n"+
@@ -511,7 +506,6 @@ func buildGroupProfile(value string) (string, gotgbot.InlineKeyboardMarkup, erro
 		formatUserProfileDisplayName(group),
 		group.ChatID,
 		formatUsername(group.Username),
-		html.EscapeString(group.Language),
 		formatTimeAgo(group.CreatedAt),
 		formatTimeAgo(group.LastSeenAt),
 		formatDownloadActivitySummary(summary.Downloads, summary.Items, summary.TotalSize, summary.LastDownloadAt),
@@ -927,21 +921,32 @@ func adminPaginationRows(screen string, page int32, total int64) [][]gotgbot.Inl
 		return nil
 	}
 
+	currentPage := strconv.FormatInt(int64(page), 10)
 	row := make([]gotgbot.InlineKeyboardButton, 0, 3)
 	if page > 0 {
 		row = append(row, gotgbot.InlineKeyboardButton{
 			Text:         "⬅️ Önceki",
 			CallbackData: adminCallbackPrefix + screen + ":" + strconv.FormatInt(int64(page-1), 10),
 		})
+	} else {
+		row = append(row, gotgbot.InlineKeyboardButton{
+			Text:         "İlk sayfa",
+			CallbackData: adminCallbackPrefix + screen + ":" + currentPage,
+		})
 	}
 	row = append(row, gotgbot.InlineKeyboardButton{
 		Text:         fmt.Sprintf("%d/%d", page+1, totalPages),
-		CallbackData: adminCallbackPrefix + screen + ":" + strconv.FormatInt(int64(page), 10),
+		CallbackData: adminCallbackPrefix + screen + ":" + currentPage,
 	})
 	if page+1 < totalPages {
 		row = append(row, gotgbot.InlineKeyboardButton{
 			Text:         "Sonraki ➡️",
 			CallbackData: adminCallbackPrefix + screen + ":" + strconv.FormatInt(int64(page+1), 10),
+		})
+	} else {
+		row = append(row, gotgbot.InlineKeyboardButton{
+			Text:         "Son sayfa",
+			CallbackData: adminCallbackPrefix + screen + ":" + currentPage,
 		})
 	}
 	return [][]gotgbot.InlineKeyboardButton{row}

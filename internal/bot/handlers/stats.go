@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"html"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	statsListLimit       int32 = 10
+	statsListLimit       int32 = 5
 	statsRecentListLimit int32 = 3
 
 	statsScreenSummary   = "summary"
@@ -105,11 +105,13 @@ func resolveStatsScreen(screen string, period string) (string, string, string, e
 	case statsScreenSummary:
 		text, err = formatStatsSummary(period)
 	case statsScreenUsers:
-		text, err = formatChatList(database.ChatTypePrivate)
-		period = statsPeriodAll
+		page := parseStatsPage(period)
+		text, page, err = formatChatList(database.ChatTypePrivate, page)
+		period = strconv.FormatInt(int64(page), 10)
 	case statsScreenGroups:
-		text, err = formatChatList(database.ChatTypeGroup)
-		period = statsPeriodAll
+		page := parseStatsPage(period)
+		text, page, err = formatChatList(database.ChatTypeGroup, page)
+		period = strconv.FormatInt(int64(page), 10)
 	case statsScreenPlatforms:
 		text, err = formatPlatformStats(period)
 	case statsScreenErrors:
@@ -145,30 +147,11 @@ func formatStatsSummary(period string) (string, error) {
 		return "", err
 	}
 
-	var privateChatsByLang map[string]int64
-	var groupChatsByLang map[string]int64
-	if err := json.Unmarshal(stats.PrivateChatsByLanguage, &privateChatsByLang); err != nil {
-		privateChatsByLang = map[string]int64{}
-	}
-	if err := json.Unmarshal(stats.GroupChatsByLanguage, &groupChatsByLang); err != nil {
-		groupChatsByLang = map[string]int64{}
-	}
-
 	message := fmt.Sprintf("<b>📊 EaDownloader Analitik</b>\nDönem: %s\n\n", periodText)
 	message += fmt.Sprintf("<b>👤 Kullanıcılar:</b> %d\n", stats.TotalPrivateChats)
 	message += fmt.Sprintf("<b>👥 Gruplar:</b> %d\n", stats.TotalGroupChats)
 	message += fmt.Sprintf("<b>📥 İndirmeler:</b> %d\n", stats.TotalDownloads)
 	message += fmt.Sprintf("<b>💾 Toplam boyut:</b> %s\n", formatBytes(stats.TotalDownloadsSize))
-
-	if len(privateChatsByLang) > 0 || len(groupChatsByLang) > 0 {
-		message += "\n<b>🌐 Diller</b>\n"
-		if len(privateChatsByLang) > 0 {
-			message += "Özel: " + formatLanguageMap(privateChatsByLang) + "\n"
-		}
-		if len(groupChatsByLang) > 0 {
-			message += "Gruplar: " + formatLanguageMap(groupChatsByLang) + "\n"
-		}
-	}
 
 	recentUsers, err := formatRecentChatLines(database.ChatTypePrivate, statsRecentListLimit)
 	if err != nil {
@@ -189,21 +172,23 @@ func formatStatsSummary(period string) (string, error) {
 	return message, nil
 }
 
-func formatChatList(chatType database.ChatType) (string, error) {
-	limit := statsListLimit
-	if chatType == database.ChatTypePrivate {
-		limit = statsRecentListLimit
+func formatChatList(chatType database.ChatType, page int32) (string, int32, error) {
+	total, err := database.Q().CountChatsByType(context.Background(), chatType)
+	if err != nil {
+		return "", page, err
 	}
+	page = clampStatsPage(page, total)
 
-	chats, err := database.Q().ListChatsByType(
+	chats, err := database.Q().ListChatsByTypePage(
 		context.Background(),
-		database.ListChatsByTypeParams{
-			Type:       chatType,
-			LimitCount: limit,
+		database.ListChatsByTypePageParams{
+			Type:        chatType,
+			LimitCount:  statsListLimit,
+			OffsetCount: statsPageOffset(page),
 		},
 	)
 	if err != nil {
-		return "", err
+		return "", page, err
 	}
 
 	title := "Kullanıcılar"
@@ -212,21 +197,26 @@ func formatChatList(chatType database.ChatType) (string, error) {
 	}
 
 	if len(chats) == 0 {
-		return fmt.Sprintf("<b>%s</b>\n\nHenüz kayıt yok.", title), nil
+		return fmt.Sprintf("<b>%s</b>\n\nHenüz kayıt yok.", title), page, nil
 	}
 
-	message := fmt.Sprintf("<b>%s</b>\nSon aktif %d kayıt\n\n", title, len(chats))
+	message := fmt.Sprintf(
+		"<b>%s</b>\nToplam: <b>%d</b> · Sayfa: <b>%d/%d</b>\n\n",
+		title,
+		total,
+		page+1,
+		totalStatsPages(total),
+	)
 	for i, chat := range chats {
 		message += fmt.Sprintf(
-			"<b>%d.</b> %s\nID: <code>%d</code>\nDil: %s\nSon görülme: %s\n\n",
-			i+1,
-			formatAdminChatDisplayName(chat),
-			chat.ChatID,
-			html.EscapeString(chat.Language),
+			"<b>%d.</b> %s\n%s\n\nID : <code>%d</code>\n\n",
+			int(statsPageOffset(page))+i+1,
+			formatAdminPageChatDisplayName(chat),
 			formatTimeAgo(chat.LastSeenAt),
+			chat.ChatID,
 		)
 	}
-	return strings.TrimSpace(message), nil
+	return strings.TrimSpace(message), page, nil
 }
 
 func formatRecentChatLines(chatType database.ChatType, limit int32) ([]string, error) {
@@ -307,22 +297,33 @@ func formatRecentErrors() (string, error) {
 }
 
 func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup {
-	buttons := [][]gotgbot.InlineKeyboardButton{
-		{
+	buttons := make([][]gotgbot.InlineKeyboardButton, 0, 5)
+	if screen == statsScreenUsers || screen == statsScreenGroups {
+		chatType := database.ChatTypePrivate
+		if screen == statsScreenGroups {
+			chatType = database.ChatTypeGroup
+		}
+		if total, err := database.Q().CountChatsByType(context.Background(), chatType); err == nil {
+			buttons = append(buttons, statsPaginationRow(screen, parseStatsPage(period), total))
+		}
+		period = statsPeriodAll
+	} else {
+		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
 			statsPeriodButton("24h", "1d", screen),
 			statsPeriodButton("7d", "7d", screen),
 			statsPeriodButton("30d", "30d", screen),
 			statsPeriodButton("all", "all", screen),
-		},
-		{
-			{Text: "👤 Kullanıcılar", CallbackData: statsCallbackPrefix + statsScreenUsers},
-			{Text: "👥 Gruplar", CallbackData: statsCallbackPrefix + statsScreenGroups},
-		},
-		{
-			{Text: "🧩 Platformlar", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
-			{Text: "🚨 Hatalar", CallbackData: statsCallbackPrefix + statsScreenErrors},
-		},
+		})
 	}
+
+	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+		{Text: "👤 Kullanıcılar", CallbackData: statsCallbackPrefix + statsScreenUsers},
+		{Text: "👥 Gruplar", CallbackData: statsCallbackPrefix + statsScreenGroups},
+	})
+	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+		{Text: "🧩 Platformlar", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
+		{Text: "🚨 Hatalar", CallbackData: statsCallbackPrefix + statsScreenErrors},
+	})
 	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
 		{Text: "📊 Özet", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
 		{Text: "⚙️ Admin", CallbackData: adminCallbackPrefix + adminScreenHome},
@@ -330,6 +331,47 @@ func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup
 
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: buttons,
+	}
+}
+
+func statsPaginationRow(screen string, page int32, total int64) []gotgbot.InlineKeyboardButton {
+	page = clampStatsPage(page, total)
+	totalPages := totalStatsPages(total)
+	if totalPages <= 1 {
+		return []gotgbot.InlineKeyboardButton{
+			{Text: "İlk sayfa", CallbackData: statsCallbackPrefix + screen + ":0"},
+			{Text: "1/1", CallbackData: statsCallbackPrefix + screen + ":0"},
+			{Text: "Son sayfa", CallbackData: statsCallbackPrefix + screen + ":0"},
+		}
+	}
+
+	currentPage := strconv.FormatInt(int64(page), 10)
+	previousButton := gotgbot.InlineKeyboardButton{
+		Text:         "İlk sayfa",
+		CallbackData: statsCallbackPrefix + screen + ":" + currentPage,
+	}
+	if page > 0 {
+		previousButton = gotgbot.InlineKeyboardButton{
+			Text:         "⬅️ Önceki",
+			CallbackData: statsCallbackPrefix + screen + ":" + strconv.FormatInt(int64(page-1), 10),
+		}
+	}
+
+	nextButton := gotgbot.InlineKeyboardButton{
+		Text:         "Son sayfa",
+		CallbackData: statsCallbackPrefix + screen + ":" + currentPage,
+	}
+	if page+1 < totalPages {
+		nextButton = gotgbot.InlineKeyboardButton{
+			Text:         "Sonraki ➡️",
+			CallbackData: statsCallbackPrefix + screen + ":" + strconv.FormatInt(int64(page+1), 10),
+		}
+	}
+
+	return []gotgbot.InlineKeyboardButton{
+		previousButton,
+		{Text: fmt.Sprintf("%d/%d", page+1, totalPages), CallbackData: statsCallbackPrefix + screen + ":" + currentPage},
+		nextButton,
 	}
 }
 
@@ -344,6 +386,36 @@ func statsPeriodButton(label string, period string, screen string) gotgbot.Inlin
 	}
 }
 
+func parseStatsPage(value string) int32 {
+	page, err := strconv.ParseInt(strings.TrimSpace(value), 10, 32)
+	if err != nil || page < 0 {
+		return 0
+	}
+	return int32(page)
+}
+
+func clampStatsPage(page int32, total int64) int32 {
+	totalPages := totalStatsPages(total)
+	if totalPages == 0 {
+		return 0
+	}
+	if page >= totalPages {
+		return totalPages - 1
+	}
+	return page
+}
+
+func totalStatsPages(total int64) int32 {
+	if total <= 0 {
+		return 1
+	}
+	return int32((total + int64(statsListLimit) - 1) / int64(statsListLimit))
+}
+
+func statsPageOffset(page int32) int32 {
+	return page * statsListLimit
+}
+
 func statsPeriod(period string) (time.Time, string) {
 	now := time.Now()
 	switch period {
@@ -356,14 +428,6 @@ func statsPeriod(period string) (time.Time, string) {
 	default:
 		return now.Add(-100 * 365 * 24 * time.Hour), "tüm zamanlar"
 	}
-}
-
-func formatLanguageMap(values map[string]int64) string {
-	parts := make([]string, 0, len(values))
-	for lang, count := range values {
-		parts = append(parts, fmt.Sprintf("%s: %d", html.EscapeString(lang), count))
-	}
-	return strings.Join(parts, ", ")
 }
 
 func formatBytes(bytes int64) string {
