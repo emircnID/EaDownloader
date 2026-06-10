@@ -82,7 +82,7 @@ func AdminCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return ext.EndGroups
 	}
 
-	text, keyboard, err := resolveAdminCallback(ctx)
+	text, keyboard, err := resolveAdminCallback(bot, ctx)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func AdminCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
-func resolveAdminCallback(ctx *ext.Context) (string, gotgbot.InlineKeyboardMarkup, error) {
+func resolveAdminCallback(bot *gotgbot.Bot, ctx *ext.Context) (string, gotgbot.InlineKeyboardMarkup, error) {
 	data := strings.TrimPrefix(ctx.CallbackQuery.Data, adminCallbackPrefix)
 
 	switch {
@@ -126,7 +126,7 @@ func resolveAdminCallback(ctx *ext.Context) (string, gotgbot.InlineKeyboardMarku
 	case data == adminScreenDbCleanup:
 		return buildDbCleanupPanel("")
 	case strings.HasPrefix(data, "db_clean:"):
-		return handleDbCleanup(ctx, strings.TrimPrefix(data, "db_clean:"))
+		return handleDbCleanup(bot, ctx, strings.TrimPrefix(data, "db_clean:"))
 	case strings.HasPrefix(data, adminScreenUser+":"):
 		return buildUserProfile(strings.TrimPrefix(data, adminScreenUser+":"))
 	case strings.HasPrefix(data, adminScreenGroup+":"):
@@ -1146,8 +1146,8 @@ func buildDbCleanupPanel(statusMessage string) (string, gotgbot.InlineKeyboardMa
 	return text, keyboard, nil
 }
 
-func handleDbCleanup(ctx *ext.Context, target string) (string, gotgbot.InlineKeyboardMarkup, error) {
-	ctx.CallbackQuery.Answer(ctx.Bot, &gotgbot.AnswerCallbackQueryOpts{
+func handleDbCleanup(bot *gotgbot.Bot, ctx *ext.Context, target string) (string, gotgbot.InlineKeyboardMarkup, error) {
+	ctx.CallbackQuery.Answer(bot, &gotgbot.AnswerCallbackQueryOpts{
 		Text: "Temizleniyor...",
 	})
 
