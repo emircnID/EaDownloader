@@ -151,6 +151,8 @@ func twitterDownloadSettings(contentURL string) *models.DownloadSettings {
 		Impersonate:         true,
 		SkipRemux:           true,
 		SkipThumbnail:       true,
+		YtDLPURL:            contentURL,
+		YtDLPFormat:         "bv*+ba/b",
 		YtDLPFallbackURL:    contentURL,
 		YtDLPFallbackFormat: "bv*+ba/b",
 	}

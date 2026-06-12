@@ -170,14 +170,6 @@ func igramCaption(details *IGramResponse) string {
 				return text
 			}
 		}
-		for _, mediaURL := range item.URL {
-			if mediaURL == nil {
-				continue
-			}
-			if text := strings.TrimSpace(mediaURL.Name); text != "" {
-				return text
-			}
-		}
 	}
 	return ""
 }

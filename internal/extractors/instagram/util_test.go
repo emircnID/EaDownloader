@@ -44,7 +44,7 @@ func TestIGramCaption(t *testing.T) {
 			},
 		},
 	})
-	if got != "media name" {
+	if got != "post caption" {
 		t.Fatalf("expected first available caption candidate, got %q", got)
 	}
 }
