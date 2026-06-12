@@ -1367,14 +1367,6 @@ func groupProfileKeyboard(groupID int64, banned bool, muted bool) gotgbot.Inline
 	}
 }
 
-func adminBackKeyboard() gotgbot.InlineKeyboardMarkup {
-	return gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			adminHomeRow(),
-		},
-	}
-}
-
 func adminPaginationRows(screen string, page int32, total int64) [][]gotgbot.InlineKeyboardButton {
 	totalPages := totalAdminPages(total)
 	if totalPages <= 1 {
