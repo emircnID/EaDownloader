@@ -53,7 +53,7 @@ const (
 
 	adminPageSize      int32 = 5
 	adminActivityLimit int32 = 5
-	adminCacheLabel    = " · cache"
+	adminCacheLabel          = " · cache"
 )
 
 func adminLocalizer(ctx *ext.Context) *localization.Localizer {
@@ -268,7 +268,7 @@ func buildUserList(localizer *localization.Localizer, pageValues ...string) (str
 		} else if activeMute, err := database.Q().GetActiveMute(context.Background(), row.ChatID); err == nil {
 			status = strings.Replace(adminText(localizer, localization.StatusMutedRemaining), "{{.Duration}}", formatDurationLeft(activeMute.ExpiresAt.Time), 1)
 		}
-		text += fmt.Sprintf("<b>%d.</b> %s\n%s · %s\nID : <code>%d</code>\n\n", int(pageOffset(page))+index+1, formatAdminPageChatDisplayName(row), status, formatTimeAgo(row.LastSeenAt), row.ChatID)
+		text += fmt.Sprintf("<b>%d.</b> %s\n%s · %s\nID : <code>%d</code>\n\n", int(pageOffset(page))+index+1, formatAdminPageChatDisplayName(row), status, formatTimeAgo(localizer, row.LastSeenAt), row.ChatID)
 	}
 
 	return strings.TrimSpace(text), userListKeyboard(localizer, rows, page, total), nil
@@ -302,7 +302,7 @@ func buildGroupList(localizer *localization.Localizer, pageValues ...string) (st
 		} else if activeMute, err := database.Q().GetActiveMute(context.Background(), row.ChatID); err == nil {
 			status = strings.Replace(adminText(localizer, localization.StatusMutedRemaining), "{{.Duration}}", formatDurationLeft(activeMute.ExpiresAt.Time), 1)
 		}
-		text += fmt.Sprintf("<b>%d.</b> %s\n%s · %s\nID : <code>%d</code>\n\n", int(pageOffset(page))+index+1, formatAdminPageChatDisplayName(row), status, formatTimeAgo(row.LastSeenAt), row.ChatID)
+		text += fmt.Sprintf("<b>%d.</b> %s\n%s · %s\nID : <code>%d</code>\n\n", int(pageOffset(page))+index+1, formatAdminPageChatDisplayName(row), status, formatTimeAgo(localizer, row.LastSeenAt), row.ChatID)
 	}
 
 	return strings.TrimSpace(text), groupListKeyboard(localizer, rows, page, total), nil
@@ -376,7 +376,7 @@ func buildBannedGroupList(localizer *localization.Localizer) (string, gotgbot.In
 			index+1,
 			formatBannedChatDisplayName(row.UserID, row.Title, row.Username, row.FirstName, row.LastName),
 			row.UserID,
-			formatTimeAgo(row.CreatedAt),
+			formatTimeAgo(localizer, row.CreatedAt),
 			adminText(localizer, localization.AdminReasonLabel),
 			html.EscapeString(row.Reason),
 		)
@@ -447,7 +447,7 @@ func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.Inl
 			index+1,
 			formatBannedUserDisplayName(row),
 			row.UserID,
-			formatTimeAgo(row.CreatedAt),
+			formatTimeAgo(localizer, row.CreatedAt),
 			adminText(localizer, localization.AdminReasonLabel),
 			html.EscapeString(row.Reason),
 		)
@@ -497,7 +497,7 @@ func buildUserProfile(localizer *localization.Localizer, value string) (string, 
 	}
 
 	text := fmt.Sprintf(
-		"<b>? %s</b>\n\n"+
+		"<b>👤 %s</b>\n\n"+
 			"%s\n"+
 			"%s: <code>%d</code>\n"+
 			"%s: %s\n"+
@@ -516,9 +516,9 @@ func buildUserProfile(localizer *localization.Localizer, value string) (string, 
 		adminText(localizer, localization.AdminStatusLabel),
 		status,
 		adminText(localizer, localization.AdminRegisteredLabel),
-		formatTimeAgo(user.CreatedAt),
+		formatTimeAgo(localizer, user.CreatedAt),
 		adminText(localizer, localization.AdminLastSeenLabel),
-		formatTimeAgo(user.LastSeenAt),
+		formatTimeAgo(localizer, user.LastSeenAt),
 		formatDownloadActivitySummary(localizer, summary.Downloads, summary.Items, summary.TotalSize, summary.LastDownloadAt),
 		formatUserPlatformBreakdown(localizer, platforms),
 		formatUserRecentDownloadEvents(localizer, recentDownloads),
@@ -567,7 +567,7 @@ func buildGroupProfile(localizer *localization.Localizer, value string) (string,
 	}
 
 	text := fmt.Sprintf(
-		"<b>? %s</b>\n\n"+
+		"<b>👥 %s</b>\n\n"+
 			"%s\n"+
 			"%s: <code>%d</code>\n"+
 			"%s: %s\n"+
@@ -586,9 +586,9 @@ func buildGroupProfile(localizer *localization.Localizer, value string) (string,
 		adminText(localizer, localization.AdminStatusLabel),
 		status,
 		adminText(localizer, localization.AdminRegisteredLabel),
-		formatTimeAgo(group.CreatedAt),
+		formatTimeAgo(localizer, group.CreatedAt),
 		adminText(localizer, localization.AdminLastActiveLabel),
-		formatTimeAgo(group.LastSeenAt),
+		formatTimeAgo(localizer, group.LastSeenAt),
 		formatDownloadActivitySummary(localizer, summary.Downloads, summary.Items, summary.TotalSize, summary.LastDownloadAt),
 		formatChatPlatformBreakdown(localizer, platforms),
 		formatChatRecentDownloadEvents(localizer, recentDownloads),
@@ -599,11 +599,11 @@ func buildGroupProfile(localizer *localization.Localizer, value string) (string,
 
 func formatDownloadActivitySummary(localizer *localization.Localizer, downloads int64, items int64, totalSize int64, lastDownloadAt pgtype.Timestamptz) string {
 	if downloads == 0 {
-		return "<b>? " + adminText(localizer, localization.AdminActivityTitle) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
+		return "<b>📈 " + adminText(localizer, localization.AdminActivityTitle) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
 	}
 	return fmt.Sprintf(
-		"<b>? %s</b>\n"+
-			"%s: <b>%d</b> ? %s: <b>%d</b>\n"+
+		"<b>📈 %s</b>\n"+
+			"%s: <b>%d</b> · %s: <b>%d</b>\n"+
 			"%s: <b>%s</b>\n"+
 			"%s: <b>%s</b>",
 		adminText(localizer, localization.AdminActivityTitle),
@@ -614,18 +614,18 @@ func formatDownloadActivitySummary(localizer *localization.Localizer, downloads 
 		adminText(localizer, localization.AdminTotal),
 		formatBytes(totalSize),
 		adminText(localizer, localization.AdminRecentDownloads),
-		formatTimeAgo(lastDownloadAt),
+		formatTimeAgo(localizer, lastDownloadAt),
 	)
 }
 
 func formatUserPlatformBreakdown(localizer *localization.Localizer, rows []database.ListUserPlatformStatsRow) string {
 	if len(rows) == 0 {
-		return "<b>? " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
+		return "<b>🧩 " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
 	}
-	lines := []string{"<b>? " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>"}
+	lines := []string{"<b>🧩 " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>"}
 	for _, row := range rows {
 		lines = append(lines, fmt.Sprintf(
-			"%s ? <b>%d</b> %s ? %s",
+			"%s · <b>%d</b> %s · %s",
 			html.EscapeString(row.ExtractorID),
 			row.Downloads,
 			adminText(localizer, localization.AdminDownloads),
@@ -637,12 +637,12 @@ func formatUserPlatformBreakdown(localizer *localization.Localizer, rows []datab
 
 func formatChatPlatformBreakdown(localizer *localization.Localizer, rows []database.ListChatPlatformStatsRow) string {
 	if len(rows) == 0 {
-		return "<b>? " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
+		return "<b>🧩 " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
 	}
-	lines := []string{"<b>? " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>"}
+	lines := []string{"<b>🧩 " + adminText(localizer, localization.AdminPlatformsTitle) + "</b>"}
 	for _, row := range rows {
 		lines = append(lines, fmt.Sprintf(
-			"%s ? <b>%d</b> %s ? %s",
+			"%s · <b>%d</b> %s · %s",
 			html.EscapeString(row.ExtractorID),
 			row.Downloads,
 			adminText(localizer, localization.AdminDownloads),
@@ -654,18 +654,18 @@ func formatChatPlatformBreakdown(localizer *localization.Localizer, rows []datab
 
 func formatUserRecentDownloadEvents(localizer *localization.Localizer, rows []database.ListUserRecentDownloadEventsRow) string {
 	if len(rows) == 0 {
-		return "<b>?? " + adminText(localizer, localization.AdminRecentDownloads) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
+		return "<b>🕘 " + adminText(localizer, localization.AdminRecentDownloads) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
 	}
-	lines := []string{"<b>?? " + adminText(localizer, localization.AdminRecentDownloads) + "</b>"}
+	lines := []string{"<b>🕘 " + adminText(localizer, localization.AdminRecentDownloads) + "</b>"}
 	for index, row := range rows {
 		recordsLabel := fmt.Sprintf("%d %s", row.ItemCount, adminText(localizer, localization.AdminRecordsWord))
 		extractorLabel := html.EscapeString(row.ExtractorID)
 		if row.FromCache {
 			extractorLabel += adminCacheLabel
 		}
-		timeAndSuffix := formatTimeAgo(row.CreatedAt) + formatEventChatSuffix(localizer, row.ChatType, row.ChatID, row.ChatTitle, row.ChatUsername)
+		timeAndSuffix := formatTimeAgo(localizer, row.CreatedAt) + formatEventChatSuffix(localizer, row.ChatType, row.ChatID, row.ChatTitle, row.ChatUsername)
 		lines = append(lines, fmt.Sprintf(
-			"%d. %s ? %s ? %s ? %s ? %s",
+			"%d. %s · %s · %s · %s · %s",
 			index+1,
 			formatDownloadEventLink(localizer, row.ContentUrl, row.ContentID),
 			extractorLabel,
@@ -679,9 +679,9 @@ func formatUserRecentDownloadEvents(localizer *localization.Localizer, rows []da
 
 func formatChatRecentDownloadEvents(localizer *localization.Localizer, rows []database.ListChatRecentDownloadEventsRow) string {
 	if len(rows) == 0 {
-		return "<b>?? " + adminText(localizer, localization.AdminRecentDownloads) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
+		return "<b>🕘 " + adminText(localizer, localization.AdminRecentDownloads) + "</b>\n" + adminText(localizer, localization.AdminNoRecords)
 	}
-	lines := []string{"<b>?? " + adminText(localizer, localization.AdminRecentDownloads) + "</b>"}
+	lines := []string{"<b>🕘 " + adminText(localizer, localization.AdminRecentDownloads) + "</b>"}
 	for index, row := range rows {
 		recordsLabel := fmt.Sprintf("%d %s", row.ItemCount, adminText(localizer, localization.AdminRecordsWord))
 		userLabel := formatEventUserLabel(row.UserID, row.UserUsername, row.UserFirstName, row.UserLastName)
@@ -689,9 +689,9 @@ func formatChatRecentDownloadEvents(localizer *localization.Localizer, rows []da
 		if row.FromCache {
 			extractorLabel += adminCacheLabel
 		}
-		timeAndLink := formatTimeAgo(row.CreatedAt) + " ? " + formatDownloadEventLink(localizer, row.ContentUrl, row.ContentID)
+		timeAndLink := formatTimeAgo(localizer, row.CreatedAt) + " · " + formatDownloadEventLink(localizer, row.ContentUrl, row.ContentID)
 		lines = append(lines, fmt.Sprintf(
-			"%d. %s ? %s ? %s ? %s ? %s",
+			"%d. %s · %s · %s · %s · %s",
 			index+1,
 			userLabel,
 			extractorLabel,
@@ -726,7 +726,7 @@ func formatEventChatSuffix(localizer *localization.Localizer, chatType database.
 	if name == "" {
 		name = strconv.FormatInt(chatID, 10)
 	}
-	return " ? " + adminText(localizer, localization.AdminGroupLabel) + ": " + html.EscapeString(name)
+	return " · " + adminText(localizer, localization.AdminGroupLabel) + ": " + html.EscapeString(name)
 }
 
 func formatEventUserLabel(userID int64, username string, firstName string, lastName string) string {
@@ -785,11 +785,11 @@ func buildBanConfirm(localizer *localization.Localizer, value string) (string, g
 		return buildUserList(localizer)
 	}
 	if util.IsAdminID(userID) {
-		return "<b>? " + adminText(localizer, localization.AdminProtectedUser) + "</b>\n\n" + adminText(localizer, localization.AdminAdminsCannotBan), userProfileKeyboard(localizer, userID, false, false), nil
+		return "<b>🛡️ " + adminText(localizer, localization.AdminProtectedUser) + "</b>\n\n" + adminText(localizer, localization.AdminAdminsCannotBan), userProfileKeyboard(localizer, userID, false, false), nil
 	}
 
 	text := fmt.Sprintf(
-		"<b>? %s</b>\n\n"+
+		"<b>🚫 %s</b>\n\n"+
 			"%s: <code>%d</code>\n\n"+
 			"%s",
 		adminText(localizer, localization.AdminBanConfirmTitle),
@@ -812,7 +812,7 @@ func buildGroupBanConfirm(localizer *localization.Localizer, value string) (stri
 	}
 
 	text := fmt.Sprintf(
-		"<b>? %s</b>\n\n"+
+		"<b>🚫 %s</b>\n\n"+
 			"%s: <code>%d</code>\n\n"+
 			"%s",
 		adminText(localizer, localization.AdminGroupBanConfirmTitle),
@@ -855,13 +855,13 @@ func buildSystemPanel(localizer *localization.Localizer) (string, gotgbot.Inline
 	uptime := time.Since(StartTime)
 
 	text := fmt.Sprintf(
-		"<b>? %s</b>\n\n"+
-			"? %s: <b>%s</b>\n"+
-			"? %s: <b>%d</b>\n"+
-			"? %s: <b>%.2f MB</b>\n"+
-			"? %s: <b>%.2f MB</b>\n"+
-			"? %s: <b>%d</b>\n\n"+
-			"<b>? %s</b>\n"+
+		"<b>🖥️ %s</b>\n\n"+
+			"⏱ %s: <b>%s</b>\n"+
+			"🧵 %s: <b>%d</b>\n"+
+			"💾 %s: <b>%.2f MB</b>\n"+
+			"🗄️ %s: <b>%.2f MB</b>\n"+
+			"⚙️ %s: <b>%d</b>\n\n"+
+			"<b>⚙️ %s</b>\n"+
 			"%s: %d\n"+
 			"%s: %d\n"+
 			"%s: %d\n"+
@@ -1300,7 +1300,7 @@ func mutedUserListKeyboard(localizer *localization.Localizer, _ []database.ListA
 }
 
 func userProfileKeyboard(localizer *localization.Localizer, userID int64, banned bool, muted bool) gotgbot.InlineKeyboardMarkup {
-		actionText := "🚫 " + adminText(localizer, localization.AdminBanButton)
+	actionText := "🚫 " + adminText(localizer, localization.AdminBanButton)
 	actionData := adminCallbackPrefix + adminActionBanConfirm + ":" + strconv.FormatInt(userID, 10)
 	if banned {
 		actionText = "✅ " + adminText(localizer, localization.AdminUnbanButton)

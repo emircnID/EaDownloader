@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"eadownloader/internal/database"
+	"eadownloader/internal/localization"
 	"eadownloader/internal/util"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -34,7 +35,8 @@ func StatsHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return ext.EndGroups
 	}
 
-	text, err := formatStatsSummary(statsPeriodAll)
+	localizer := adminLocalizer(ctx)
+	text, err := formatStatsSummary(localizer, statsPeriodAll)
 	if err != nil {
 		return err
 	}
@@ -44,7 +46,7 @@ func StatsHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		text,
 		&gotgbot.SendMessageOpts{
 			ParseMode:   gotgbot.ParseModeHTML,
-			ReplyMarkup: getStatsKeyboard(statsScreenSummary, statsPeriodAll),
+			ReplyMarkup: getStatsKeyboard(localizer, statsScreenSummary, statsPeriodAll),
 		},
 	)
 	return ext.EndGroups
@@ -55,7 +57,8 @@ func StatsCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return ext.EndGroups
 	}
 
-	text, screen, period, err := resolveStatsCallback(ctx.CallbackQuery.Data)
+	localizer := adminLocalizer(ctx)
+	text, screen, period, err := resolveStatsCallback(localizer, ctx.CallbackQuery.Data)
 	if err != nil {
 		return err
 	}
@@ -66,23 +69,23 @@ func StatsCallbackHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		text,
 		&gotgbot.EditMessageTextOpts{
 			ParseMode:   gotgbot.ParseModeHTML,
-			ReplyMarkup: getStatsKeyboard(screen, period),
+			ReplyMarkup: getStatsKeyboard(localizer, screen, period),
 		},
 	)
 	return nil
 }
 
-func resolveStatsCallback(data string) (string, string, string, error) {
+func resolveStatsCallback(localizer *localization.Localizer, data string) (string, string, string, error) {
 	parts := strings.Split(data, ":")
 	if len(parts) == 2 {
 		if isStatsScreen(parts[1]) {
-			return resolveStatsScreen(parts[1], statsPeriodAll)
+			return resolveStatsScreen(localizer, parts[1], statsPeriodAll)
 		}
-		text, err := formatStatsSummary(parts[1])
+		text, err := formatStatsSummary(localizer, parts[1])
 		return text, statsScreenSummary, parts[1], err
 	}
 	if len(parts) < 2 {
-		text, err := formatStatsSummary(statsPeriodAll)
+		text, err := formatStatsSummary(localizer, statsPeriodAll)
 		return text, statsScreenSummary, statsPeriodAll, err
 	}
 
@@ -91,27 +94,27 @@ func resolveStatsCallback(data string) (string, string, string, error) {
 		period = parts[2]
 	}
 
-	return resolveStatsScreen(parts[1], period)
+	return resolveStatsScreen(localizer, parts[1], period)
 }
 
-func resolveStatsScreen(screen string, period string) (string, string, string, error) {
+func resolveStatsScreen(localizer *localization.Localizer, screen string, period string) (string, string, string, error) {
 	var (
 		text string
 		err  error
 	)
 	switch screen {
 	case statsScreenSummary:
-		text, err = formatStatsSummary(period)
+		text, err = formatStatsSummary(localizer, period)
 	case statsScreenPlatforms:
-		text, err = formatPlatformStats(period)
+		text, err = formatPlatformStats(localizer, period)
 	case statsScreenRecentDownloads:
-		text, err = formatGlobalRecentDownloads()
+		text, err = formatGlobalRecentDownloads(localizer)
 		period = statsPeriodAll
 	case statsScreenErrors:
-		text, err = formatRecentErrors()
+		text, err = formatRecentErrors(localizer)
 		period = statsPeriodAll
 	default:
-		text, err = formatStatsSummary(statsPeriodAll)
+		text, err = formatStatsSummary(localizer, statsPeriodAll)
 		screen = statsScreenSummary
 		period = statsPeriodAll
 	}
@@ -127,8 +130,8 @@ func isStatsScreen(value string) bool {
 	}
 }
 
-func formatStatsSummary(period string) (string, error) {
-	sinceDate, periodText := statsPeriod(period)
+func formatStatsSummary(localizer *localization.Localizer, period string) (string, error) {
+	sinceDate, periodText := statsPeriod(localizer, period)
 	stats, err := database.Q().GetStats(
 		context.Background(),
 		pgtype.Timestamptz{
@@ -140,33 +143,32 @@ func formatStatsSummary(period string) (string, error) {
 		return "", err
 	}
 
-	message := fmt.Sprintf("<b>📊 EaDownloader Analitik</b>\nDönem: %s\n\n", periodText)
-	message += fmt.Sprintf("<b>👤 Kullanıcılar:</b> %d\n", stats.TotalPrivateChats)
-	message += fmt.Sprintf("<b>👥 Gruplar:</b> %d\n", stats.TotalGroupChats)
-	message += fmt.Sprintf("<b>📥 İndirmeler:</b> %d\n", stats.TotalDownloads)
-	message += fmt.Sprintf("<b>💾 Toplam boyut:</b> %s\n", formatBytes(stats.TotalDownloadsSize))
+	message := fmt.Sprintf("<b>📊 EaDownloader %s</b>\n%s: %s\n\n", adminText(localizer, localization.AdminAnalytics), adminText(localizer, localization.AdminPeriodLabel), periodText)
+	message += fmt.Sprintf("<b>👤 %s:</b> %d\n", adminText(localizer, localization.AdminUsers), stats.TotalPrivateChats)
+	message += fmt.Sprintf("<b>👥 %s:</b> %d\n", adminText(localizer, localization.AdminGroups), stats.TotalGroupChats)
+	message += fmt.Sprintf("<b>📥 %s:</b> %d\n", adminText(localizer, localization.AdminDownloads), stats.TotalDownloads)
+	message += fmt.Sprintf("<b>💾 %s:</b> %s\n", adminText(localizer, localization.AdminTotal), formatBytes(stats.TotalDownloadsSize))
 
-	recentUsers, err := formatRecentChatLines(database.ChatTypePrivate, statsRecentListLimit)
+	recentUsers, err := formatRecentChatLines(localizer, database.ChatTypePrivate, statsRecentListLimit)
 	if err != nil {
 		return "", err
 	}
 	if len(recentUsers) > 0 {
-		message += "\n<b>👤 Son Özel Kullanıcılar</b>\n" + strings.Join(recentUsers, "\n") + "\n"
+		message += "\n<b>👤 " + adminText(localizer, localization.AdminRecentUsersTitle) + "</b>\n" + strings.Join(recentUsers, "\n") + "\n"
 	}
 
-	recentGroups, err := formatRecentChatLines(database.ChatTypeGroup, statsRecentListLimit)
+	recentGroups, err := formatRecentChatLines(localizer, database.ChatTypeGroup, statsRecentListLimit)
 	if err != nil {
 		return "", err
 	}
 	if len(recentGroups) > 0 {
-		message += "\n<b>👥 Son Gruplar</b>\n" + strings.Join(recentGroups, "\n") + "\n"
+		message += "\n<b>👥 " + adminText(localizer, localization.AdminRecentGroupsTitle) + "</b>\n" + strings.Join(recentGroups, "\n") + "\n"
 	}
 
 	return message, nil
 }
 
-
-func formatRecentChatLines(chatType database.ChatType, limit int32) ([]string, error) {
+func formatRecentChatLines(localizer *localization.Localizer, chatType database.ChatType, limit int32) ([]string, error) {
 	chats, err := database.Q().ListChatsByType(
 		context.Background(),
 		database.ListChatsByTypeParams{
@@ -184,14 +186,14 @@ func formatRecentChatLines(chatType database.ChatType, limit int32) ([]string, e
 			"%d. %s · %s",
 			index+1,
 			formatAdminChatDisplayName(chat),
-			formatTimeAgo(chat.LastSeenAt),
+			formatTimeAgo(localizer, chat.LastSeenAt),
 		))
 	}
 	return lines, nil
 }
 
-func formatPlatformStats(period string) (string, error) {
-	sinceDate, periodText := statsPeriod(period)
+func formatPlatformStats(localizer *localization.Localizer, period string) (string, error) {
+	sinceDate, periodText := statsPeriod(localizer, period)
 	rows, err := database.Q().GetPlatformStats(
 		context.Background(),
 		pgtype.Timestamptz{
@@ -204,54 +206,58 @@ func formatPlatformStats(period string) (string, error) {
 	}
 
 	if len(rows) == 0 {
-		return fmt.Sprintf("<b>🧩 Platformlar</b>\nDönem: %s\n\nHenüz indirme yok.", periodText), nil
+		return fmt.Sprintf("<b>🧩 %s</b>\n%s: %s\n\n%s", adminText(localizer, localization.AdminPlatformsTitle), adminText(localizer, localization.AdminPeriodLabel), periodText, adminText(localizer, localization.AdminNoDownloads)), nil
 	}
 
-	message := fmt.Sprintf("<b>🧩 Platformlar</b>\nDönem: %s\n\n", periodText)
+	message := fmt.Sprintf("<b>🧩 %s</b>\n%s: %s\n\n", adminText(localizer, localization.AdminPlatformsTitle), adminText(localizer, localization.AdminPeriodLabel), periodText)
 	for i, row := range rows {
 		message += fmt.Sprintf(
-			"<b>%d. %s</b>\nİndirme: %d\nBoyut: %s\n\n",
+			"<b>%d. %s</b>\n%s: %d\n%s: %s\n\n",
 			i+1,
 			html.EscapeString(row.ExtractorID),
+			adminText(localizer, localization.AdminDownloadLabel),
 			row.Downloads,
+			adminText(localizer, localization.AdminSizeLabel),
 			formatBytes(row.TotalSize),
 		)
 	}
 	return strings.TrimSpace(message), nil
 }
 
-func formatRecentErrors() (string, error) {
+func formatRecentErrors(localizer *localization.Localizer) (string, error) {
 	rows, err := database.Q().GetRecentErrors(context.Background(), statsListLimit)
 	if err != nil {
 		return "", err
 	}
 	if len(rows) == 0 {
-		return "<b>🚨 Son Hatalar</b>\n\nKayıtlı hata yok.", nil
+		return "<b>🚨 " + adminText(localizer, localization.AdminRecentErrorsTitle) + "</b>\n\n" + adminText(localizer, localization.AdminNoErrors), nil
 	}
 
-	message := "<b>🚨 Son Hatalar</b>\n\n"
+	message := "<b>🚨 " + adminText(localizer, localization.AdminRecentErrorsTitle) + "</b>\n\n"
 	for i, row := range rows {
 		message += fmt.Sprintf(
-			"<b>%d. <code>%s</code></b>\nTekrar: %d\nSon görülme: %s\n%s\n\n",
+			"<b>%d. <code>%s</code></b>\n%s: %d\n%s: %s\n%s\n\n",
 			i+1,
 			html.EscapeString(row.ID),
+			adminText(localizer, localization.AdminOccurrencesLabel),
 			row.Occurrences,
-			formatTimestamp(row.LastSeen.Time),
+			adminText(localizer, localization.AdminLastSeenLabel),
+			formatTimestamp(localizer, row.LastSeen.Time),
 			truncateText(row.Message, 180),
 		)
 	}
 	return strings.TrimSpace(message), nil
 }
 
-func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup {
+func getStatsKeyboard(localizer *localization.Localizer, screen string, period string) gotgbot.InlineKeyboardMarkup {
 	buttons := make([][]gotgbot.InlineKeyboardButton, 0, 4)
 	if screen == statsScreenErrors {
 		return gotgbot.InlineKeyboardMarkup{
 			InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 				{
-					{Text: "🖥 Sistem Paneli", CallbackData: adminCallbackPrefix + adminScreenSystem},
+					{Text: "🖥 " + adminText(localizer, localization.AdminSystemPanel), CallbackData: adminCallbackPrefix + adminScreenSystem},
 				},
-				statsHomeRow(),
+				statsHomeRow(localizer),
 			},
 		}
 	}
@@ -266,31 +272,31 @@ func getStatsKeyboard(screen string, period string) gotgbot.InlineKeyboardMarkup
 	switch screen {
 	case statsScreenSummary:
 		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
-			{Text: "🧩 Platformlar", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
-			{Text: "📥 Son İndirmeler", CallbackData: statsCallbackPrefix + statsScreenRecentDownloads + ":" + period},
+			{Text: "🧩 " + adminText(localizer, localization.AdminPlatformsTitle), CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
+			{Text: "📥 " + adminText(localizer, localization.AdminRecentDownloads), CallbackData: statsCallbackPrefix + statsScreenRecentDownloads + ":" + period},
 		})
 	case statsScreenPlatforms:
 		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
-			{Text: "📊 Özet", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
-			{Text: "📥 Son İndirmeler", CallbackData: statsCallbackPrefix + statsScreenRecentDownloads + ":" + period},
+			{Text: "📊 " + adminText(localizer, localization.AdminSummaryButton), CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
+			{Text: "📥 " + adminText(localizer, localization.AdminRecentDownloads), CallbackData: statsCallbackPrefix + statsScreenRecentDownloads + ":" + period},
 		})
 	case statsScreenRecentDownloads:
 		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
-			{Text: "📊 Özet", CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
-			{Text: "🧩 Platformlar", CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
+			{Text: "📊 " + adminText(localizer, localization.AdminSummaryButton), CallbackData: statsCallbackPrefix + statsScreenSummary + ":" + period},
+			{Text: "🧩 " + adminText(localizer, localization.AdminPlatformsTitle), CallbackData: statsCallbackPrefix + statsScreenPlatforms + ":" + period},
 		})
 	}
 
-	buttons = append(buttons, statsHomeRow())
+	buttons = append(buttons, statsHomeRow(localizer))
 
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: buttons,
 	}
 }
 
-func statsHomeRow() []gotgbot.InlineKeyboardButton {
+func statsHomeRow(localizer *localization.Localizer) []gotgbot.InlineKeyboardButton {
 	return []gotgbot.InlineKeyboardButton{
-		{Text: "🏠 Ana menü", CallbackData: adminCallbackPrefix + adminScreenHome},
+		{Text: "🏠 " + adminText(localizer, localization.AdminHomeButton), CallbackData: adminCallbackPrefix + adminScreenHome},
 	}
 }
 func statsPeriodButton(label string, period string, screen string) gotgbot.InlineKeyboardButton {
@@ -304,18 +310,17 @@ func statsPeriodButton(label string, period string, screen string) gotgbot.Inlin
 	}
 }
 
-
-func statsPeriod(period string) (time.Time, string) {
+func statsPeriod(localizer *localization.Localizer, period string) (time.Time, string) {
 	now := time.Now()
 	switch period {
 	case "1d":
-		return now.Add(-24 * time.Hour), "24 saat"
+		return now.Add(-24 * time.Hour), adminText(localizer, localization.AdminPeriod24h)
 	case "7d":
-		return now.Add(-7 * 24 * time.Hour), "7 gün"
+		return now.Add(-7 * 24 * time.Hour), adminText(localizer, localization.AdminPeriod7d)
 	case "30d":
-		return now.Add(-30 * 24 * time.Hour), "30 gün"
+		return now.Add(-30 * 24 * time.Hour), adminText(localizer, localization.AdminPeriod30d)
 	default:
-		return now.Add(-100 * 365 * 24 * time.Hour), "tüm zamanlar"
+		return now.Add(-100 * 365 * 24 * time.Hour), adminText(localizer, localization.AdminPeriodAll)
 	}
 }
 
@@ -337,25 +342,25 @@ func formatBytes(bytes int64) string {
 	}
 }
 
-func formatTimeAgo(value pgtype.Timestamptz) string {
+func formatTimeAgo(localizer *localization.Localizer, value pgtype.Timestamptz) string {
 	if !value.Valid {
-		return "unknown"
+		return adminText(localizer, localization.AdminTimeUnknown)
 	}
-	return formatTimestamp(value.Time)
+	return formatTimestamp(localizer, value.Time)
 }
 
-func formatTimestamp(value time.Time) string {
+func formatTimestamp(localizer *localization.Localizer, value time.Time) string {
 	if value.IsZero() {
-		return "unknown"
+		return adminText(localizer, localization.AdminTimeUnknown)
 	}
 	duration := time.Since(value)
 	switch {
 	case duration < time.Minute:
-		return "az önce"
+		return adminText(localizer, localization.AdminTimeJustNow)
 	case duration < time.Hour:
-		return fmt.Sprintf("%d dk önce", int(duration.Minutes()))
+		return adminTextTemplate(localizer, localization.AdminTimeMinutesAgo, map[string]int{"Count": int(duration.Minutes())})
 	case duration < 24*time.Hour:
-		return fmt.Sprintf("%d sa önce", int(duration.Hours()))
+		return adminTextTemplate(localizer, localization.AdminTimeHoursAgo, map[string]int{"Count": int(duration.Hours())})
 	default:
 		return value.Format("2006-01-02 15:04")
 	}
@@ -369,7 +374,7 @@ func truncateText(text string, limit int) string {
 	return text[:limit] + "..."
 }
 
-func formatGlobalRecentDownloads() (string, error) {
+func formatGlobalRecentDownloads(localizer *localization.Localizer) (string, error) {
 	rows, err := database.Conn().Query(context.Background(), `
 		SELECT 
 			d.extractor_id,
@@ -424,14 +429,13 @@ func formatGlobalRecentDownloads() (string, error) {
 			return "", err
 		}
 
-		// Format user display name
 		var userDisp string
 		uName := strings.TrimSpace(strings.Join([]string{uFirstName, uLastName}, " "))
 		if uName == "" && uUsername != "" {
 			uName = "@" + uUsername
 		}
 		if uName == "" {
-			userDisp = "Bilinmeyen Kullanıcı"
+			userDisp = adminText(localizer, localization.AdminUnknownUser)
 		} else {
 			userDisp = html.EscapeString(uName)
 			if uUsername != "" && !strings.Contains(strings.ToLower(uName), strings.ToLower("@"+uUsername)) {
@@ -439,7 +443,6 @@ func formatGlobalRecentDownloads() (string, error) {
 			}
 		}
 
-		// Format source chat display name if group
 		var groupDisp string
 		if chatType == "group" {
 			gName := strings.TrimSpace(cTitle)
@@ -447,7 +450,7 @@ func formatGlobalRecentDownloads() (string, error) {
 				gName = "@" + cUsername
 			}
 			if gName == "" {
-				groupDisp = "Bilinmeyen Grup"
+				groupDisp = adminText(localizer, localization.AdminUnknownGroup)
 			} else {
 				groupDisp = html.EscapeString(gName)
 				if cUsername != "" && !strings.Contains(strings.ToLower(gName), strings.ToLower("@"+cUsername)) {
@@ -456,7 +459,6 @@ func formatGlobalRecentDownloads() (string, error) {
 			}
 		}
 
-		// Format link - truncate if too long
 		displayURL := contentURL
 		if len(displayURL) > 30 {
 			displayURL = displayURL[:27] + "..."
@@ -470,17 +472,17 @@ func formatGlobalRecentDownloads() (string, error) {
 		line := fmt.Sprintf("<b>%d. 🧩 %s</b>\n", count, html.EscapeString(platformName))
 		line += fmt.Sprintf("   👤 %s\n", userDisp)
 		if chatType == "group" {
-			line += fmt.Sprintf("   👥 Grup: %s\n", groupDisp)
+			line += fmt.Sprintf("   👥 %s: %s\n", adminText(localizer, localization.AdminGroupLabel), groupDisp)
 		}
 		line += fmt.Sprintf("   🔗 <a href=\"%s\">%s</a>\n", html.EscapeString(contentURL), html.EscapeString(displayURL))
-		line += fmt.Sprintf("   💾 %s · %d adet\n", formatBytes(totalFileSize), itemCount)
-		line += fmt.Sprintf("   ⏱ %s", formatTimestamp(createdAt))
+		line += fmt.Sprintf("   💾 %s · %d %s\n", formatBytes(totalFileSize), itemCount, adminText(localizer, localization.AdminRecordsWord))
+		line += fmt.Sprintf("   ⏱ %s", formatTimestamp(localizer, createdAt))
 		lines = append(lines, line)
 	}
 
 	if count == 0 {
-		return "<b>📥 Son İndirilenler</b>\n\nHenüz indirme kaydı yok.", nil
+		return "<b>📥 " + adminText(localizer, localization.AdminRecentDownloads) + "</b>\n\n" + adminText(localizer, localization.AdminNoDownloads), nil
 	}
 
-	return "<b>📥 Son İndirilenler</b>\n\n" + strings.Join(lines, "\n\n"), nil
+	return "<b>📥 " + adminText(localizer, localization.AdminRecentDownloads) + "</b>\n\n" + strings.Join(lines, "\n\n"), nil
 }

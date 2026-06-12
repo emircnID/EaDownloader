@@ -247,6 +247,26 @@ var (
 		ID:    "AdminPage",
 		Other: "Page",
 	}
+	AdminPeriodLabel = &i18n.Message{
+		ID:    "AdminPeriodLabel",
+		Other: "Period",
+	}
+	AdminPeriod24h = &i18n.Message{
+		ID:    "AdminPeriod24h",
+		Other: "24 hours",
+	}
+	AdminPeriod7d = &i18n.Message{
+		ID:    "AdminPeriod7d",
+		Other: "7 days",
+	}
+	AdminPeriod30d = &i18n.Message{
+		ID:    "AdminPeriod30d",
+		Other: "30 days",
+	}
+	AdminPeriodAll = &i18n.Message{
+		ID:    "AdminPeriodAll",
+		Other: "all time",
+	}
 	AdminUptimeLabel = &i18n.Message{
 		ID:    "AdminUptimeLabel",
 		Other: "Uptime",
@@ -426,6 +446,62 @@ var (
 	AdminRecentDownloads = &i18n.Message{
 		ID:    "AdminRecentDownloads",
 		Other: "Recent Downloads",
+	}
+	AdminRecentUsersTitle = &i18n.Message{
+		ID:    "AdminRecentUsersTitle",
+		Other: "Recent Private Users",
+	}
+	AdminRecentGroupsTitle = &i18n.Message{
+		ID:    "AdminRecentGroupsTitle",
+		Other: "Recent Groups",
+	}
+	AdminSummaryButton = &i18n.Message{
+		ID:    "AdminSummaryButton",
+		Other: "Summary",
+	}
+	AdminDownloadLabel = &i18n.Message{
+		ID:    "AdminDownloadLabel",
+		Other: "Downloads",
+	}
+	AdminSizeLabel = &i18n.Message{
+		ID:    "AdminSizeLabel",
+		Other: "Size",
+	}
+	AdminNoDownloads = &i18n.Message{
+		ID:    "AdminNoDownloads",
+		Other: "No downloads yet.",
+	}
+	AdminRecentErrorsTitle = &i18n.Message{
+		ID:    "AdminRecentErrorsTitle",
+		Other: "Recent Errors",
+	}
+	AdminNoErrors = &i18n.Message{
+		ID:    "AdminNoErrors",
+		Other: "No errors recorded.",
+	}
+	AdminOccurrencesLabel = &i18n.Message{
+		ID:    "AdminOccurrencesLabel",
+		Other: "Occurrences",
+	}
+	AdminUnknownGroup = &i18n.Message{
+		ID:    "AdminUnknownGroup",
+		Other: "Unknown Group",
+	}
+	AdminTimeUnknown = &i18n.Message{
+		ID:    "AdminTimeUnknown",
+		Other: "unknown",
+	}
+	AdminTimeJustNow = &i18n.Message{
+		ID:    "AdminTimeJustNow",
+		Other: "just now",
+	}
+	AdminTimeMinutesAgo = &i18n.Message{
+		ID:    "AdminTimeMinutesAgo",
+		Other: "{{.Count}} min ago",
+	}
+	AdminTimeHoursAgo = &i18n.Message{
+		ID:    "AdminTimeHoursAgo",
+		Other: "{{.Count}} hr ago",
 	}
 	AdminReasonLabel = &i18n.Message{
 		ID:    "AdminReasonLabel",
