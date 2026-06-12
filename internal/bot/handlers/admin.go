@@ -53,6 +53,7 @@ const (
 
 	adminPageSize      int32 = 5
 	adminActivityLimit int32 = 5
+	adminCacheLabel    = " · cache"
 )
 
 func adminLocalizer(ctx *ext.Context) *localization.Localizer {
@@ -660,7 +661,7 @@ func formatUserRecentDownloadEvents(localizer *localization.Localizer, rows []da
 		recordsLabel := fmt.Sprintf("%d %s", row.ItemCount, adminText(localizer, localization.AdminRecordsWord))
 		extractorLabel := html.EscapeString(row.ExtractorID)
 		if row.FromCache {
-			extractorLabel += " ? cache"
+			extractorLabel += adminCacheLabel
 		}
 		timeAndSuffix := formatTimeAgo(row.CreatedAt) + formatEventChatSuffix(localizer, row.ChatType, row.ChatID, row.ChatTitle, row.ChatUsername)
 		lines = append(lines, fmt.Sprintf(
@@ -686,7 +687,7 @@ func formatChatRecentDownloadEvents(localizer *localization.Localizer, rows []da
 		userLabel := formatEventUserLabel(row.UserID, row.UserUsername, row.UserFirstName, row.UserLastName)
 		extractorLabel := html.EscapeString(row.ExtractorID)
 		if row.FromCache {
-			extractorLabel += " ? cache"
+			extractorLabel += adminCacheLabel
 		}
 		timeAndLink := formatTimeAgo(row.CreatedAt) + " ? " + formatDownloadEventLink(localizer, row.ContentUrl, row.ContentID)
 		lines = append(lines, fmt.Sprintf(
@@ -712,15 +713,6 @@ func formatDownloadEventLink(localizer *localization.Localizer, contentURL strin
 		return "<code>" + label + "</code>"
 	}
 	return fmt.Sprintf("<a href='%s'>%s</a>", html.EscapeString(contentURL), label)
-}
-
-func formatCacheMarker(fromCache bool) string {
-
-
-	if !fromCache {
-		return ""
-	}
-	return " ? cache"
 }
 
 func formatEventChatSuffix(localizer *localization.Localizer, chatType database.ChatType, chatID int64, title pgtype.Text, username pgtype.Text) string {
