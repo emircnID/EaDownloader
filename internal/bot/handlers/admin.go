@@ -1367,7 +1367,7 @@ func groupProfileKeyboard(groupID int64, banned bool, muted bool) gotgbot.Inline
 	}
 }
 
-func adminBackKeyboard(_ string) gotgbot.InlineKeyboardMarkup {
+func adminBackKeyboard() gotgbot.InlineKeyboardMarkup {
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			adminHomeRow(),
