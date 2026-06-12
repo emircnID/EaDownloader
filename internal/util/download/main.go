@@ -109,6 +109,40 @@ func DownloadFileWithYtDLP(
 	ctx.FilesTracker.Add(filePath)
 
 	args := ytDLPDownloadArgs(filePath, settings)
+	if len(args) > 0 {
+		urlArg := args[len(args)-1]
+		args = args[:len(args)-1]
+
+		// Add proxy support
+		proxy := ctx.HTTPClient.DownloadProxy
+		if proxy == "" {
+			proxy = ctx.HTTPClient.Proxy
+		}
+		if proxy != "" {
+			args = append(args, "--proxy", proxy)
+		} else if ctx.HTTPClient.DisableProxy {
+			args = append(args, "--proxy", "")
+		}
+
+		// Add headers support
+		for k, v := range settings.Headers {
+			if strings.EqualFold(k, "host") {
+				continue
+			}
+			args = append(args, "--add-header", fmt.Sprintf("%s:%s", k, v))
+		}
+
+		// Add cookies support
+		if len(settings.Cookies) > 0 {
+			var cookieParts []string
+			for _, c := range settings.Cookies {
+				cookieParts = append(cookieParts, fmt.Sprintf("%s=%s", c.Name, c.Value))
+			}
+			args = append(args, "--add-header", "Cookie:"+strings.Join(cookieParts, "; "))
+		}
+
+		args = append(args, urlArg)
+	}
 	ctx.Debugf("attempting yt-dlp download with format: %s", settings.YtDLPFormat)
 
 	cmd := exec.CommandContext(ctx.Context, "yt-dlp", args...)

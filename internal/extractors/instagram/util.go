@@ -128,12 +128,16 @@ func mediaCaption(data *Media) string {
 			if edge == nil || edge.Node == nil {
 				continue
 			}
-			if text := strings.TrimSpace(edge.Node.Text); text != "" {
+			if text := strings.TrimSpace(edge.Node.Text); text != "" && !isFormatName(text) {
 				return text
 			}
 		}
 	}
-	return strings.TrimSpace(data.Title)
+	title := strings.TrimSpace(data.Title)
+	if isFormatName(title) {
+		return ""
+	}
+	return title
 }
 
 func contextCaption(ctxJSON *ContextJSON) string {
@@ -146,7 +150,7 @@ func contextCaption(ctxJSON *ContextJSON) string {
 		ctxJSON.Context.Title,
 		ctxJSON.Context.AltText,
 	} {
-		if text := strings.TrimSpace(candidate); text != "" {
+		if text := strings.TrimSpace(candidate); text != "" && !isFormatName(text) {
 			return text
 		}
 	}
@@ -166,12 +170,22 @@ func igramCaption(details *IGramResponse) string {
 			item.Title,
 			item.Description,
 		} {
-			if text := strings.TrimSpace(candidate); text != "" {
+			if text := strings.TrimSpace(candidate); text != "" && !isFormatName(text) {
 				return text
 			}
 		}
 	}
 	return ""
+}
+
+func isFormatName(s string) bool {
+	s = strings.ToLower(strings.TrimSpace(s))
+	switch s {
+	case "mp4", "jpg", "jpeg", "png", "webp", "heic", "video", "photo", "image", "gif", "mov", "avi", "mp3", "m4a", "flac", "ogg", "webm":
+		return true
+	default:
+		return false
+	}
 }
 
 func ParseEmbedGQL(body []byte) (*Media, error) {

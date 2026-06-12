@@ -48,3 +48,20 @@ func TestIGramCaption(t *testing.T) {
 		t.Fatalf("expected first available caption candidate, got %q", got)
 	}
 }
+
+func TestIGramCaptionIgnoresFormatNames(t *testing.T) {
+	got := igramCaption(&IGramResponse{
+		Items: []*IGramMedia{
+			{
+				Caption: "mp4",
+				Title:   "video",
+			},
+			{
+				Caption: "My real post caption",
+			},
+		},
+	})
+	if got != "My real post caption" {
+		t.Fatalf("expected real post caption, got %q", got)
+	}
+}
