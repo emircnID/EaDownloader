@@ -102,7 +102,7 @@ func SanitizeCaption(caption string) string {
 	return strings.TrimSpace(regex.ReplaceAllString(caption, ""))
 }
 
-func ExtractVideoFormats(media *MediaEntity) ([]*models.MediaFormat, error) {
+func ExtractVideoFormats(media *MediaEntity, contentURL string, cookies []*http.Cookie) ([]*models.MediaFormat, error) {
 	var formats []*models.MediaFormat
 
 	if media.VideoInfo == nil {
@@ -116,21 +116,40 @@ func ExtractVideoFormats(media *MediaEntity) ([]*models.MediaFormat, error) {
 			width, height := ResolutionFromURL(variant.URL)
 
 			formats = append(formats, &models.MediaFormat{
-				Type:         database.MediaTypeVideo,
-				FormatID:     fmt.Sprintf("mp4_%d", variant.Bitrate),
-				URL:          []string{variant.URL},
-				VideoCodec:   database.MediaCodecAvc,
-				AudioCodec:   database.MediaCodecAac,
-				Duration:     duration,
-				ThumbnailURL: []string{media.MediaURLHTTPS},
-				Width:        width,
-				Height:       height,
-				Bitrate:      variant.Bitrate,
+				Type:             database.MediaTypeVideo,
+				FormatID:         fmt.Sprintf("mp4_%d", variant.Bitrate),
+				URL:              []string{variant.URL},
+				VideoCodec:       database.MediaCodecAvc,
+				AudioCodec:       database.MediaCodecAac,
+				Duration:         duration,
+				ThumbnailURL:     []string{media.MediaURLHTTPS},
+				Width:            width,
+				Height:           height,
+				Bitrate:          variant.Bitrate,
+				DownloadSettings: twitterDownloadSettings(contentURL, cookies),
 			})
 		}
 	}
 
 	return formats, nil
+}
+
+func twitterDownloadSettings(contentURL string, cookies []*http.Cookie) *models.DownloadSettings {
+	referer := contentURL
+	if referer == "" {
+		referer = "https://x.com/"
+	}
+
+	return &models.DownloadSettings{
+		Headers: map[string]string{
+			"Referer": referer,
+			"Origin":  "https://x.com",
+		},
+		Cookies:       cookies,
+		Retries:       3,
+		SkipRemux:     true,
+		SkipThumbnail: true,
+	}
 }
 
 func ResolutionFromURL(url string) (int32, int32) {

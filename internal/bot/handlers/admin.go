@@ -191,7 +191,7 @@ func buildAdminHome() (string, gotgbot.InlineKeyboardMarkup, error) {
 		metricBar("👥 Gruplar", stats.TotalGroupChats, max(stats.TotalPrivateChats, stats.TotalGroupChats)),
 		metricBar("📥 İndirmeler", stats.TotalDownloads, stats.TotalDownloads),
 		metricBar("🔇 Susturulan", mutedCount, max(stats.TotalPrivateChats+stats.TotalGroupChats, 1)),
-		metricBar("⛔ Banlı", bannedCount, max(stats.TotalPrivateChats+stats.TotalGroupChats, 1)),
+		metricBar("⛔ "+statusBanned, bannedCount, max(stats.TotalPrivateChats+stats.TotalGroupChats, 1)),
 		formatBytes(stats.TotalDownloadsSize),
 	)
 
@@ -229,8 +229,6 @@ func metricBar(label string, value int64, maxValue int64) string {
 		value,
 	)
 }
-
-
 
 func buildUserList(pageValues ...string) (string, gotgbot.InlineKeyboardMarkup, error) {
 	page := parseAdminPage(pageValues...)
@@ -348,7 +346,7 @@ func buildMutedGroupList() (string, gotgbot.InlineKeyboardMarkup, error) {
 	}
 
 	if len(rows) == 0 {
-		return "<b>🔇 Susturulan Gruplar</b>\n\nAktif susturulan grup yok.", mutedGroupListKeyboard(), nil
+		return "<b>🔇 Susturulan Gruplar</b>\n\nŞu an susturulan grup yok.", mutedGroupListKeyboard(), nil
 	}
 
 	text := fmt.Sprintf("<b>🔇 Susturulan Gruplar</b>\nToplam: <b>%d</b>\n\n", total)
@@ -380,10 +378,10 @@ func buildBannedGroupList() (string, gotgbot.InlineKeyboardMarkup, error) {
 	}
 
 	if len(rows) == 0 {
-		return "<b>⛔ Banlı Gruplar</b>\n\nHenüz banlı grup yok.", bannedGroupListKeyboard(), nil
+		return "<b>⛔ " + statusBanned + " Gruplar</b>\n\nHenüz " + strings.ToLower(statusBanned) + " grup yok.", bannedGroupListKeyboard(), nil
 	}
 
-	text := fmt.Sprintf("<b>⛔ Banlı Gruplar</b>\nToplam: <b>%d</b>\n\n", total)
+	text := fmt.Sprintf("<b>⛔ "+statusBanned+" Gruplar</b>\nToplam: <b>%d</b>\n\n", total)
 	for index, row := range rows {
 		text += fmt.Sprintf(
 			"<b>%d.</b> %s\n<code>%d</code> · %s\nSebep: %s\n\n",
@@ -409,7 +407,7 @@ func buildMutedUserList() (string, gotgbot.InlineKeyboardMarkup, error) {
 	}
 
 	if len(rows) == 0 {
-		return "<b>🔇 Susturulan Kullanıcılar</b>\n\nAktif susturma yok.", mutedUserListKeyboard(rows), nil
+		return "<b>🔇 Susturulan Kullanıcılar</b>\n\nŞu an susturma yok.", mutedUserListKeyboard(rows), nil
 	}
 
 	text := fmt.Sprintf("<b>🔇 Susturulan Kullanıcılar</b>\nToplam: <b>%d</b>\n\n", total)
@@ -438,10 +436,10 @@ func buildBannedUserList() (string, gotgbot.InlineKeyboardMarkup, error) {
 	}
 
 	if len(rows) == 0 {
-		return "<b>⛔ Banlı Kullanıcılar</b>\n\nHenüz banlı kullanıcı yok.", bannedUserListKeyboard(rows), nil
+		return "<b>⛔ " + statusBanned + " Kullanıcılar</b>\n\nHenüz " + strings.ToLower(statusBanned) + " kullanıcı yok.", bannedUserListKeyboard(rows), nil
 	}
 
-	text := fmt.Sprintf("<b>⛔ Banlı Kullanıcılar</b>\nToplam: <b>%d</b>\n\n", total)
+	text := fmt.Sprintf("<b>⛔ "+statusBanned+" Kullanıcılar</b>\nToplam: <b>%d</b>\n\n", total)
 	for index, row := range rows {
 		text += fmt.Sprintf(
 			"<b>%d.</b> %s\n<code>%d</code> · %s\nSebep: %s\n\n",
@@ -844,14 +842,14 @@ func buildSystemPanel() (string, gotgbot.InlineKeyboardMarkup, error) {
 	text := fmt.Sprintf(
 		"<b>🖥 Sistem Durumu</b>\n\n"+
 			"⏱ Çalışma Süresi: <b>%s</b>\n"+
-			"🧵 Aktif Goroutine: <b>%d</b>\n"+
+			"🧵 "+statusActive+" Goroutine: <b>%d</b>\n"+
 			"🐏 Kullanılan Bellek: <b>%.2f MB</b>\n"+
 			"💾 Sistem Belleği: <b>%.2f MB</b>\n"+
 			"⚙️ CPU Çekirdeği: <b>%d</b>\n\n"+
 			"<b>⚙️ Konfigürasyon</b>\n"+
 			"Adminler: %d\n"+
 			"Whitelist: %d\n"+
-			"Banlı chat: %d\n"+
+			statusBanned+" chat: %d\n"+
 			"Susturulan chat: %d\n"+
 			"Eşzamanlı işlem: %d\n"+
 			"Maksimum süre: %s\n"+
@@ -1031,7 +1029,7 @@ func userListKeyboard(_ []database.ListChatsByTypePageRow, page int32, total int
 	buttons := make([][]gotgbot.InlineKeyboardButton, 0, 4)
 	buttons = append(buttons, adminPaginationRows(adminScreenUsers, page, total)...)
 	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
-		{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
+		{Text: "⛔ " + statusBanned + "lar", CallbackData: adminCallbackPrefix + adminScreenBans},
 		{Text: "🔇 Susturulanlar", CallbackData: adminCallbackPrefix + adminScreenMutes},
 	})
 	buttons = append(buttons, adminHomeRow())
@@ -1042,7 +1040,7 @@ func groupListKeyboard(_ []database.ListChatsByTypePageRow, page int32, total in
 	buttons := make([][]gotgbot.InlineKeyboardButton, 0, 3)
 	buttons = append(buttons, adminPaginationRows(adminScreenGroups, page, total)...)
 	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
-		{Text: "⛔ Banlı Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroupBans},
+		{Text: "⛔ " + statusBanned + " Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroupBans},
 		{Text: "🔇 Susturulan Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroupMutes},
 	})
 	buttons = append(buttons, adminHomeRow())
@@ -1066,7 +1064,7 @@ func mutedGroupListKeyboard() gotgbot.InlineKeyboardMarkup {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{Text: "👥 Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroups},
-				{Text: "⛔ Banlı Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroupBans},
+				{Text: "⛔ " + statusBanned + " Gruplar", CallbackData: adminCallbackPrefix + adminScreenGroupBans},
 			},
 			adminHomeRow(),
 		},
@@ -1250,7 +1248,7 @@ func mutedUserListKeyboard(_ []database.ListActiveMutedUsersRow) gotgbot.InlineK
 	buttons := make([][]gotgbot.InlineKeyboardButton, 0, 4)
 	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
 		{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
-		{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
+		{Text: "⛔ " + statusBanned + "lar", CallbackData: adminCallbackPrefix + adminScreenBans},
 	})
 	buttons = append(buttons, adminHomeRow())
 	return gotgbot.InlineKeyboardMarkup{InlineKeyboard: buttons}
@@ -1282,7 +1280,7 @@ func userProfileKeyboard(userID int64, banned bool, muted bool) gotgbot.InlineKe
 			muteRow,
 			{
 				{Text: "👤 Kullanıcılar", CallbackData: adminCallbackPrefix + adminScreenUsers},
-				{Text: "⛔ Banlılar", CallbackData: adminCallbackPrefix + adminScreenBans},
+				{Text: "⛔ " + statusBanned + "lar", CallbackData: adminCallbackPrefix + adminScreenBans},
 			},
 			adminHomeRow(),
 		},
@@ -1521,8 +1519,6 @@ func bannedUserDisplayLabel(row database.ListBannedUsersRow) string {
 	}
 	return name
 }
-
-
 
 func formatUsername(username string) string {
 	if strings.TrimSpace(username) == "" {

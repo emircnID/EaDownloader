@@ -109,16 +109,17 @@ func MediaFromAPI(ctx *models.ExtractorContext) (*models.Media, error) {
 
 		switch mediaEntity.Type {
 		case "video", "animated_gif":
-			formats, err := ExtractVideoFormats(mediaEntity)
+			formats, err := ExtractVideoFormats(mediaEntity, ctx.ContentURL, ctx.HTTPClient.Cookies)
 			if err != nil {
 				return nil, err
 			}
 			item.AddFormats(formats...)
 		case "photo":
 			item.AddFormats(&models.MediaFormat{
-				Type:     database.MediaTypePhoto,
-				FormatID: "photo",
-				URL:      []string{mediaEntity.MediaURLHTTPS},
+				Type:             database.MediaTypePhoto,
+				FormatID:         "photo",
+				URL:              []string{mediaEntity.MediaURLHTTPS},
+				DownloadSettings: twitterDownloadSettings(ctx.ContentURL, ctx.HTTPClient.Cookies),
 			})
 		}
 	}
@@ -206,28 +207,30 @@ func MediaFromFXAPI(ctx *models.ExtractorContext) (*models.Media, error) {
 		}
 		item := media.NewItem()
 		item.AddFormats(&models.MediaFormat{
-			Type:     database.MediaTypePhoto,
-			FormatID: nonEmpty(photo.ID, "photo"),
-			URL:      []string{photo.URL},
-			Width:    photo.Width,
-			Height:   photo.Height,
+			Type:             database.MediaTypePhoto,
+			FormatID:         nonEmpty(photo.ID, "photo"),
+			URL:              []string{photo.URL},
+			Width:            photo.Width,
+			Height:           photo.Height,
+			DownloadSettings: twitterDownloadSettings(ctx.ContentURL, ctx.HTTPClient.Cookies),
 		})
 	}
 
 	for _, video := range status.Media.Videos {
-		formats := formatsFromFXVideo(video)
+		formats := formatsFromFXVideo(video, ctx.ContentURL, ctx.HTTPClient.Cookies)
 		if len(formats) == 0 && video.URL != "" {
 			formats = append(formats, &models.MediaFormat{
-				Type:         database.MediaTypeVideo,
-				FormatID:     nonEmpty(video.ID, "video"),
-				URL:          []string{video.URL},
-				VideoCodec:   database.MediaCodecAvc,
-				AudioCodec:   database.MediaCodecAac,
-				Duration:     int32(video.Duration),
-				ThumbnailURL: []string{video.ThumbnailURL},
-				Width:        video.Width,
-				Height:       video.Height,
-				FileSize:     video.Filesize,
+				Type:             database.MediaTypeVideo,
+				FormatID:         nonEmpty(video.ID, "video"),
+				URL:              []string{video.URL},
+				VideoCodec:       database.MediaCodecAvc,
+				AudioCodec:       database.MediaCodecAac,
+				Duration:         int32(video.Duration),
+				ThumbnailURL:     []string{video.ThumbnailURL},
+				Width:            video.Width,
+				Height:           video.Height,
+				FileSize:         video.Filesize,
+				DownloadSettings: twitterDownloadSettings(ctx.ContentURL, ctx.HTTPClient.Cookies),
 			})
 		}
 		if len(formats) == 0 {
@@ -283,7 +286,7 @@ func GetTweetFXAPI(ctx *models.ExtractorContext) (*FXStatus, error) {
 	return apiResponse.Status, nil
 }
 
-func formatsFromFXVideo(video FXVideo) []*models.MediaFormat {
+func formatsFromFXVideo(video FXVideo, contentURL string, cookies []*http.Cookie) []*models.MediaFormat {
 	formats := make([]*models.MediaFormat, 0, len(video.Formats))
 	duration := int32(video.Duration)
 
@@ -308,17 +311,18 @@ func formatsFromFXVideo(video FXVideo) []*models.MediaFormat {
 		}
 
 		formats = append(formats, &models.MediaFormat{
-			Type:         database.MediaTypeVideo,
-			FormatID:     formatID,
-			URL:          []string{source.URL},
-			VideoCodec:   videoCodec,
-			AudioCodec:   database.MediaCodecAac,
-			Duration:     duration,
-			ThumbnailURL: []string{video.ThumbnailURL},
-			Width:        firstInt32(source.Width, video.Width),
-			Height:       firstInt32(source.Height, video.Height),
-			Bitrate:      source.Bitrate,
-			FileSize:     firstInt64(source.Size, video.Filesize),
+			Type:             database.MediaTypeVideo,
+			FormatID:         formatID,
+			URL:              []string{source.URL},
+			VideoCodec:       videoCodec,
+			AudioCodec:       database.MediaCodecAac,
+			Duration:         duration,
+			ThumbnailURL:     []string{video.ThumbnailURL},
+			Width:            firstInt32(source.Width, video.Width),
+			Height:           firstInt32(source.Height, video.Height),
+			Bitrate:          source.Bitrate,
+			FileSize:         firstInt64(source.Size, video.Filesize),
+			DownloadSettings: twitterDownloadSettings(contentURL, cookies),
 		})
 	}
 	return formats
