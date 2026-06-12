@@ -247,6 +247,82 @@ var (
 		ID:    "AdminPage",
 		Other: "Page",
 	}
+	AdminUptimeLabel = &i18n.Message{
+		ID:    "AdminUptimeLabel",
+		Other: "Uptime",
+	}
+	AdminGoroutineLabel = &i18n.Message{
+		ID:    "AdminGoroutineLabel",
+		Other: "Goroutine",
+	}
+	AdminMemoryUsedLabel = &i18n.Message{
+		ID:    "AdminMemoryUsedLabel",
+		Other: "Memory used",
+	}
+	AdminSystemMemoryLabel = &i18n.Message{
+		ID:    "AdminSystemMemoryLabel",
+		Other: "System memory",
+	}
+	AdminCPUCoreLabel = &i18n.Message{
+		ID:    "AdminCPUCoreLabel",
+		Other: "CPU core",
+	}
+	AdminConfigurationTitle = &i18n.Message{
+		ID:    "AdminConfigurationTitle",
+		Other: "Configuration",
+	}
+	AdminAdminsLabel = &i18n.Message{
+		ID:    "AdminAdminsLabel",
+		Other: "Admins",
+	}
+	AdminWhitelistLabel = &i18n.Message{
+		ID:    "AdminWhitelistLabel",
+		Other: "Whitelist",
+	}
+	AdminBannedChatsLabel = &i18n.Message{
+		ID:    "AdminBannedChatsLabel",
+		Other: "Banned chats",
+	}
+	AdminMutedChatsLabel = &i18n.Message{
+		ID:    "AdminMutedChatsLabel",
+		Other: "Muted chats",
+	}
+	AdminConcurrentLabel = &i18n.Message{
+		ID:    "AdminConcurrentLabel",
+		Other: "Concurrent operations",
+	}
+	AdminMaxDurationLabel = &i18n.Message{
+		ID:    "AdminMaxDurationLabel",
+		Other: "Maximum duration",
+	}
+	AdminMaxFileSizeLabel = &i18n.Message{
+		ID:    "AdminMaxFileSizeLabel",
+		Other: "Maximum file size",
+	}
+	AdminCacheLabel = &i18n.Message{
+		ID:    "AdminCacheLabel",
+		Other: "Cache",
+	}
+	AdminLogLevelLabel = &i18n.Message{
+		ID:    "AdminLogLevelLabel",
+		Other: "Log level",
+	}
+	AdminTimeLabel = &i18n.Message{
+		ID:    "AdminTimeLabel",
+		Other: "Time",
+	}
+	AdminContentLabel = &i18n.Message{
+		ID:    "AdminContentLabel",
+		Other: "content",
+	}
+	AdminGroupLabel = &i18n.Message{
+		ID:    "AdminGroupLabel",
+		Other: "group",
+	}
+	AdminRecordsWord = &i18n.Message{
+		ID:    "AdminRecordsWord",
+		Other: "records",
+	}
 	AdminFirstPageButton = &i18n.Message{
 		ID:    "AdminFirstPageButton",
 		Other: "First page",
@@ -438,6 +514,14 @@ var (
 	AdminCleanupErrorsButton = &i18n.Message{
 		ID:    "AdminCleanupErrorsButton",
 		Other: "Clear Errors",
+	}
+	AdminErrorsButton = &i18n.Message{
+		ID:    "AdminErrorsButton",
+		Other: "Errors",
+	}
+	AdminDatabaseCleanupButton = &i18n.Message{
+		ID:    "AdminDatabaseCleanupButton",
+		Other: "Database Cleanup",
 	}
 	AdminCleanupCleaning = &i18n.Message{
 		ID:    "AdminCleanupCleaning",
