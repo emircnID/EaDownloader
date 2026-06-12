@@ -42,6 +42,7 @@ func New(
 	resp, err := client.FetchWithContext(
 		ctx, http.MethodHead, url,
 		&networking.RequestParams{
+			Headers: settings.Headers,
 			Cookies: settings.Cookies,
 		},
 	)
