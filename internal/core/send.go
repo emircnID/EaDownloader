@@ -1,9 +1,13 @@
 package core
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"eadownloader/internal/config"
 	"eadownloader/internal/database"
@@ -13,6 +17,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
+
+const telegramSendAttempts = 3
 
 func SendFormats(
 	bot *gotgbot.Bot,
@@ -73,7 +79,8 @@ func SendFormats(
 		extractorCtx.Progress(uploadProgressMessage(chunk))
 		if len(chunk) == 1 {
 			util.SendMediaAction(bot, chatID, chunk[0].Format.Type)
-			msg, err := sendSingleFormat(
+			msg, err := sendSingleFormatWithRetry(
+				extractorCtx,
 				bot, chatID,
 				chunk[0],
 				options.Caption,
@@ -108,9 +115,10 @@ func SendFormats(
 
 		util.SendMediaAction(bot, chatID, chunk[0].Format.Type)
 
-		msgs, err := bot.SendMediaGroup(
-			chatID,
-			inputMediaList,
+		msgs, err := sendMediaGroupWithRetry(
+			extractorCtx,
+			bot,
+			chatID, inputMediaList,
 			messageOptions,
 		)
 		if err != nil {
@@ -435,4 +443,94 @@ func SendInlineFormats(
 	}
 
 	return nil
+}
+
+func sendMediaGroupWithRetry(
+	extractorCtx *models.ExtractorContext,
+	bot *gotgbot.Bot,
+	chatID int64,
+	inputMediaList []gotgbot.InputMedia,
+	messageOptions *gotgbot.SendMediaGroupOpts,
+) ([]gotgbot.Message, error) {
+	var lastErr error
+	for attempt := range telegramSendAttempts {
+		msgs, err := bot.SendMediaGroup(chatID, inputMediaList, messageOptions)
+		if err == nil {
+			return msgs, nil
+		}
+		lastErr = err
+		if !waitTelegramRetry(extractorCtx, err, attempt) {
+			break
+		}
+	}
+	return nil, lastErr
+}
+
+func sendSingleFormatWithRetry(
+	extractorCtx *models.ExtractorContext,
+	bot *gotgbot.Bot,
+	chatID int64,
+	format *models.DownloadedFormat,
+	caption string,
+	spoiler bool,
+	messageOptions *gotgbot.SendMediaGroupOpts,
+) (*gotgbot.Message, error) {
+	var lastErr error
+	for attempt := range telegramSendAttempts {
+		msg, err := sendSingleFormat(
+			bot, chatID, format,
+			caption, spoiler,
+			messageOptions,
+		)
+		if err == nil {
+			return msg, nil
+		}
+		lastErr = err
+		if !waitTelegramRetry(extractorCtx, err, attempt) {
+			break
+		}
+	}
+	return nil, lastErr
+}
+
+func waitTelegramRetry(extractorCtx *models.ExtractorContext, err error, attempt int) bool {
+	if attempt >= telegramSendAttempts-1 {
+		return false
+	}
+	delay, ok := telegramRetryDelay(err)
+	if !ok {
+		return false
+	}
+
+	if extractorCtx != nil {
+		extractorCtx.Warnf("telegram rate limited upload, retrying after %s: %v", delay, err)
+	}
+
+	ctx := context.Background()
+	if extractorCtx != nil && extractorCtx.Context != nil {
+		ctx = extractorCtx.Context
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func telegramRetryDelay(err error) (time.Duration, bool) {
+	var telegramErr *gotgbot.TelegramError
+	if !errors.As(err, &telegramErr) {
+		return 0, false
+	}
+	if telegramErr.Code != http.StatusTooManyRequests ||
+		telegramErr.ResponseParams == nil ||
+		telegramErr.ResponseParams.RetryAfter <= 0 {
+		return 0, false
+	}
+	return time.Duration(telegramErr.ResponseParams.RetryAfter) * time.Second, true
 }

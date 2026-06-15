@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,6 +31,11 @@ func DownloadFile(
 	}
 	settings = ensureDownloadSettings(settings)
 	ensureDownloadDir()
+
+	urlList = normalizeDownloadURLs(urlList)
+	if len(urlList) == 0 {
+		return "", fmt.Errorf("no valid URLs to download")
+	}
 
 	client := downloadClient(ctx, settings)
 
@@ -232,6 +238,18 @@ func DownloadFileWithSegments(
 	settings = ensureDownloadSettings(settings)
 	ensureDownloadDir()
 
+	segmentURLs = normalizeDownloadURLs(segmentURLs)
+	if len(segmentURLs) == 0 {
+		return "", fmt.Errorf("no valid segment URLs to download")
+	}
+	if initSegmentURL != "" {
+		initSegmentURLs := normalizeDownloadURLs([]string{initSegmentURL})
+		if len(initSegmentURLs) == 0 {
+			return "", fmt.Errorf("invalid init segment URL")
+		}
+		initSegmentURL = initSegmentURLs[0]
+	}
+
 	client := downloadClient(ctx, settings)
 
 	filePath := ToPath(fileName)
@@ -295,6 +313,11 @@ func DownloadFileInMemory(
 		return nil, fmt.Errorf("nil extractor context")
 	}
 	settings = ensureDownloadSettings(settings)
+
+	urlList = normalizeDownloadURLs(urlList)
+	if len(urlList) == 0 {
+		return nil, fmt.Errorf("no valid URLs to download")
+	}
 
 	client := downloadClient(ctx, settings)
 	maxRetries := max(settings.Retries, 1)
@@ -435,4 +458,26 @@ func resetFile(file *os.File) error {
 	}
 	_, err := file.Seek(0, io.SeekStart)
 	return err
+}
+
+func normalizeDownloadURLs(urls []string) []string {
+	normalized := make([]string, 0, len(urls))
+	for _, rawURL := range urls {
+		downloadURL := strings.TrimSpace(rawURL)
+		if downloadURL == "" {
+			continue
+		}
+		parsedURL, err := url.Parse(downloadURL)
+		if err != nil {
+			continue
+		}
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			continue
+		}
+		if parsedURL.Host == "" {
+			continue
+		}
+		normalized = append(normalized, downloadURL)
+	}
+	return normalized
 }

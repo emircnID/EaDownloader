@@ -61,62 +61,85 @@ var (
 )
 
 func ParseGQLMedia(ctx *models.ExtractorContext, data *Media) (*models.Media, error) {
+	if data == nil {
+		return nil, fmt.Errorf("media data is nil")
+	}
+
 	media := ctx.NewMedia()
 	media.SetCaption(mediaCaption(data))
 
 	switch data.Typename {
 	case "GraphVideo", "XDTGraphVideo":
-		item := media.NewItem()
-		item.AddFormats(&models.MediaFormat{
-			FormatID:     "video",
-			Type:         database.MediaTypeVideo,
-			VideoCodec:   database.MediaCodecAvc,
-			AudioCodec:   database.MediaCodecAac,
-			URL:          []string{data.VideoURL},
-			ThumbnailURL: []string{data.DisplayURL},
-			Width:        data.Dimensions.Width,
-			Height:       data.Dimensions.Height,
-		})
+		addGQLVideoFormat(media, data)
 	case "GraphImage", "XDTGraphImage":
-		item := media.NewItem()
-		item.AddFormats(&models.MediaFormat{
-			FormatID: "image",
-			Type:     database.MediaTypePhoto,
-			URL:      []string{data.DisplayURL},
-		})
+		addGQLImageFormat(media, data.DisplayURL)
 	case "GraphSidecar", "XDTGraphSidecar":
 		if data.EdgeSidecarToChildren != nil && len(data.EdgeSidecarToChildren.Edges) > 0 {
 			edges := data.EdgeSidecarToChildren.Edges
 
 			for i := range edges {
-				item := media.NewItem()
+				if edges[i] == nil {
+					continue
+				}
 				node := edges[i].Node
+				if node == nil {
+					continue
+				}
 
 				switch node.Typename {
 				case "GraphVideo", "XDTGraphVideo":
-					item.AddFormats(&models.MediaFormat{
-						FormatID:     "video",
-						Type:         database.MediaTypeVideo,
-						VideoCodec:   database.MediaCodecAvc,
-						AudioCodec:   database.MediaCodecAac,
-						URL:          []string{node.VideoURL},
-						ThumbnailURL: []string{node.DisplayURL},
-						Width:        node.Dimensions.Width,
-						Height:       node.Dimensions.Height,
-					})
-
+					addGQLVideoFormat(media, node)
 				case "GraphImage", "XDTGraphImage":
-					item.AddFormats(&models.MediaFormat{
-						FormatID: "image",
-						Type:     database.MediaTypePhoto,
-						URL:      []string{node.DisplayURL},
-					})
+					addGQLImageFormat(media, node.DisplayURL)
 				}
 			}
 		}
 	}
 
+	if len(media.Items) == 0 {
+		return nil, fmt.Errorf("no downloadable media found")
+	}
+
 	return media, nil
+}
+
+func addGQLVideoFormat(media *models.Media, data *Media) {
+	videoURL := strings.TrimSpace(data.VideoURL)
+	if !isHTTPURL(videoURL) {
+		return
+	}
+
+	item := media.NewItem()
+	format := &models.MediaFormat{
+		FormatID:         "video",
+		Type:             database.MediaTypeVideo,
+		VideoCodec:       database.MediaCodecAvc,
+		AudioCodec:       database.MediaCodecAac,
+		URL:              []string{videoURL},
+		DownloadSettings: instagramDownloadSettings(),
+	}
+	if data.Dimensions != nil {
+		format.Width = data.Dimensions.Width
+		format.Height = data.Dimensions.Height
+	}
+	if thumbnailURL := strings.TrimSpace(data.DisplayURL); isHTTPURL(thumbnailURL) {
+		format.ThumbnailURL = []string{thumbnailURL}
+	}
+	item.AddFormats(format)
+}
+
+func addGQLImageFormat(media *models.Media, imageURL string) {
+	imageURL = strings.TrimSpace(imageURL)
+	if !isHTTPURL(imageURL) {
+		return
+	}
+	item := media.NewItem()
+	item.AddFormats(&models.MediaFormat{
+		FormatID:         "image",
+		Type:             database.MediaTypePhoto,
+		URL:              []string{imageURL},
+		DownloadSettings: instagramDownloadSettings(),
+	})
 }
 
 func mediaCaption(data *Media) string {
@@ -341,16 +364,58 @@ func ParseIGramResponse(body []byte) (*IGramResponse, error) {
 }
 
 func GetCDNURL(contentURL string) (string, error) {
+	contentURL = strings.TrimSpace(contentURL)
+	if contentURL == "" {
+		return "", fmt.Errorf("empty igram URL")
+	}
 	parsedURL, err := url.Parse(contentURL)
 	if err != nil {
 		return "", fmt.Errorf("can't parse igram URL: %w", err)
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return "", fmt.Errorf("unsupported igram URL scheme: %s", parsedURL.Scheme)
 	}
 	queryParams, err := url.ParseQuery(parsedURL.RawQuery)
 	if err != nil {
 		return "", fmt.Errorf("can't unescape igram URL: %w", err)
 	}
 	cdnURL := queryParams.Get("uri")
+	if cdnURL == "" {
+		if parsedURL.Host == "" {
+			return "", fmt.Errorf("igram URL has no host")
+		}
+		return contentURL, nil
+	}
+	if !isHTTPURL(cdnURL) {
+		return "", fmt.Errorf("invalid igram CDN URL")
+	}
 	return cdnURL, nil
+}
+
+func instagramDownloadSettings() *models.DownloadSettings {
+	return &models.DownloadSettings{
+		Headers:     instagramDownloadHeaders(),
+		Impersonate: true,
+	}
+}
+
+func instagramDownloadHeaders() map[string]string {
+	headers := make(map[string]string, len(webHeaders)+2)
+	for key, value := range webHeaders {
+		headers[key] = value
+	}
+	headers["Referer"] = "https://www.instagram.com/"
+	headers["Origin"] = "https://www.instagram.com"
+	return headers
+}
+
+func isHTTPURL(rawURL string) bool {
+	parsedURL, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return false
+	}
+	return (parsedURL.Scheme == "http" || parsedURL.Scheme == "https") &&
+		parsedURL.Host != ""
 }
 
 func GetGQLData(ctx *models.ExtractorContext) (*GraphQLData, error) {

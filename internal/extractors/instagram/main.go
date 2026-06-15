@@ -136,40 +136,42 @@ func GetIGramPost(ctx *models.ExtractorContext) (*models.Media, error) {
 	media := ctx.NewMedia()
 	media.SetCaption(igramCaption(details))
 	for _, obj := range details.Items {
-		item := media.NewItem()
-		if len(obj.URL) == 0 {
-			return nil, fmt.Errorf("no media url found")
+		if obj == nil || len(obj.URL) == 0 || obj.URL[0] == nil {
+			continue
 		}
 		urlObj := obj.URL[0]
 		contentURL, err := GetCDNURL(urlObj.URL)
 		if err != nil {
-			return nil, err
-		}
-		thumbnailURL, err := GetCDNURL(obj.Thumb)
-		if err != nil {
-			return nil, err
+			ctx.Warnf("skipping igram media with invalid URL: %v", err)
+			continue
 		}
 		fileExt := urlObj.Ext
 		formatID := urlObj.Type
 		switch fileExt {
 		case "mp4":
-			item.AddFormats(&models.MediaFormat{
-				FormatID:     formatID,
-				Type:         database.MediaTypeVideo,
-				URL:          []string{contentURL},
-				VideoCodec:   database.MediaCodecAvc,
-				AudioCodec:   database.MediaCodecAac,
-				ThumbnailURL: []string{thumbnailURL},
-			},
-			)
+			item := media.NewItem()
+			format := &models.MediaFormat{
+				FormatID:         formatID,
+				Type:             database.MediaTypeVideo,
+				URL:              []string{contentURL},
+				VideoCodec:       database.MediaCodecAvc,
+				AudioCodec:       database.MediaCodecAac,
+				DownloadSettings: instagramDownloadSettings(),
+			}
+			if thumbnailURL, err := GetCDNURL(obj.Thumb); err == nil {
+				format.ThumbnailURL = []string{thumbnailURL}
+			}
+			item.AddFormats(format)
 		case "jpg", "png", "webp", "heic", "jpeg":
+			item := media.NewItem()
 			item.AddFormats(&models.MediaFormat{
-				Type:     database.MediaTypePhoto,
-				FormatID: formatID,
-				URL:      []string{contentURL},
+				Type:             database.MediaTypePhoto,
+				FormatID:         formatID,
+				URL:              []string{contentURL},
+				DownloadSettings: instagramDownloadSettings(),
 			})
 		default:
-			return nil, fmt.Errorf("unknown format: %s", fileExt)
+			ctx.Warnf("skipping unknown igram format: %s", fileExt)
 		}
 	}
 
@@ -196,19 +198,30 @@ func GetIGramStory(ctx *models.ExtractorContext) (*models.Media, error) {
 	item := media.NewItem()
 	if isVideo {
 		video := GetBestVideoVersion(result.VideoVersions)
+		if video == nil || !isHTTPURL(video.URL) {
+			return nil, fmt.Errorf("no valid story video URL found")
+		}
 		item.AddFormats(&models.MediaFormat{
-			FormatID:   "video",
-			Type:       database.MediaTypeVideo,
-			URL:        []string{video.URL},
-			VideoCodec: database.MediaCodecAvc,
-			AudioCodec: database.MediaCodecAac,
+			FormatID:         "video",
+			Type:             database.MediaTypeVideo,
+			URL:              []string{video.URL},
+			VideoCodec:       database.MediaCodecAvc,
+			AudioCodec:       database.MediaCodecAac,
+			DownloadSettings: instagramDownloadSettings(),
 		})
 	} else {
+		if result.ImageVersions == nil {
+			return nil, fmt.Errorf("no story image versions found")
+		}
 		image := GetBestCandidate(result.ImageVersions.Candidates)
+		if image == nil || !isHTTPURL(image.URL) {
+			return nil, fmt.Errorf("no valid story image URL found")
+		}
 		item.AddFormats(&models.MediaFormat{
-			Type:     database.MediaTypePhoto,
-			FormatID: "photo",
-			URL:      []string{image.URL},
+			Type:             database.MediaTypePhoto,
+			FormatID:         "photo",
+			URL:              []string{image.URL},
+			DownloadSettings: instagramDownloadSettings(),
 		})
 	}
 
