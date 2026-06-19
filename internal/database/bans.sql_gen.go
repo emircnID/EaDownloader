@@ -42,8 +42,12 @@ func (q *Queries) BanUser(ctx context.Context, arg BanUserParams) (BannedUsers, 
 const countBannedChatsByType = `-- name: CountBannedChatsByType :one
 SELECT COUNT(*)::BIGINT
 FROM banned_users b
-JOIN chat c ON c.chat_id = b.user_id
-WHERE c.type = $1
+LEFT JOIN chat c ON c.chat_id = b.user_id
+WHERE (
+    $1::chat_type = 'private'
+    AND b.user_id > 0
+    AND (c.type IS NULL OR c.type = 'private')
+) OR c.type = $1
 `
 
 func (q *Queries) CountBannedChatsByType(ctx context.Context, type_ ChatType) (int64, error) {
@@ -148,11 +152,12 @@ SELECT
     b.reason,
     b.banned_by,
     b.created_at,
-    c.username,
-    c.first_name,
-    c.last_name
+    COALESCE(c.username, '') AS username,
+    COALESCE(c.first_name, '') AS first_name,
+    COALESCE(c.last_name, '') AS last_name
 FROM banned_users b
-JOIN chat c ON c.chat_id = b.user_id AND c.type = 'private'
+LEFT JOIN chat c ON c.chat_id = b.user_id AND c.type = 'private'
+WHERE b.user_id > 0
 ORDER BY b.created_at DESC
 LIMIT $1
 `
