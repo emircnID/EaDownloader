@@ -132,7 +132,7 @@ func resolveAdminCallback(bot *gotgbot.Bot, ctx *ext.Context, localizer *localiz
 	case strings.HasPrefix(data, adminScreenGroups+":"):
 		return buildGroupList(localizer, strings.TrimPrefix(data, adminScreenGroups+":"))
 	case data == adminScreenBans:
-		return buildBannedUserList(localizer)
+		return buildBannedUserList(bot, localizer)
 	case data == adminScreenMutes:
 		return buildMutedUserList(localizer)
 	case data == adminScreenGroupBans:
@@ -421,7 +421,7 @@ func buildMutedUserList(localizer *localization.Localizer) (string, gotgbot.Inli
 	return strings.TrimSpace(text), mutedUserListKeyboard(localizer, rows), nil
 }
 
-func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.InlineKeyboardMarkup, error) {
+func buildBannedUserList(bot *gotgbot.Bot, localizer *localization.Localizer) (string, gotgbot.InlineKeyboardMarkup, error) {
 	total, err := database.Q().CountBannedChatsByType(context.Background(), database.ChatTypePrivate)
 	if err != nil {
 		return "", gotgbot.InlineKeyboardMarkup{}, err
@@ -442,6 +442,7 @@ func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.Inl
 		total,
 	)
 	for index, row := range rows {
+		row = resolveBannedUserDisplay(bot, row)
 		text += fmt.Sprintf(
 			"<b>%d.</b> %s\n<code>%d</code> · %s\n%s: %s\n\n",
 			index+1,
@@ -454,6 +455,49 @@ func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.Inl
 	}
 
 	return strings.TrimSpace(text), bannedUserListKeyboard(localizer, rows), nil
+}
+
+func resolveBannedUserDisplay(bot *gotgbot.Bot, row database.ListBannedUsersRow) database.ListBannedUsersRow {
+	if bot == nil || bannedUserHasDisplayName(row) {
+		return row
+	}
+
+	chat, err := bot.GetChat(row.UserID, nil)
+	if err != nil || chat == nil || chat.Type != gotgbot.ChatTypePrivate {
+		return row
+	}
+
+	row.Username = chat.Username
+	row.FirstName = chat.FirstName
+	row.LastName = chat.LastName
+	if !bannedUserHasDisplayName(row) {
+		return row
+	}
+
+	_, _ = database.Q().GetOrCreateChat(
+		context.Background(),
+		database.GetOrCreateChatParams{
+			ChatID:          row.UserID,
+			Type:            database.ChatTypePrivate,
+			Username:        row.Username,
+			FirstName:       row.FirstName,
+			LastName:        row.LastName,
+			Language:        config.Env.DefaultLanguage,
+			Captions:        config.Env.DefaultCaptions,
+			Silent:          config.Env.DefaultSilent,
+			Nsfw:            config.Env.DefaultNSFW,
+			MediaAlbumLimit: config.Env.DefaultMediaAlbumLimit,
+			DeleteLinks:     config.Env.DefaultDeleteLinks,
+		},
+	)
+
+	return row
+}
+
+func bannedUserHasDisplayName(row database.ListBannedUsersRow) bool {
+	return strings.TrimSpace(row.FirstName) != "" ||
+		strings.TrimSpace(row.LastName) != "" ||
+		strings.TrimSpace(row.Username) != ""
 }
 
 func buildUserProfile(localizer *localization.Localizer, value string) (string, gotgbot.InlineKeyboardMarkup, error) {
@@ -1470,7 +1514,11 @@ func bannedUserDisplayLabel(localizer *localization.Localizer, row database.List
 		name = "@" + strings.TrimSpace(row.Username)
 	}
 	if name == "" {
-		name = adminText(localizer, localization.AdminUnknownUser)
+		name = adminTextTemplate(
+			localizer,
+			localization.AdminUserIDLabel,
+			map[string]string{"ID": strconv.FormatInt(row.UserID, 10)},
+		)
 	}
 	return name
 }

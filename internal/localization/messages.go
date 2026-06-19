@@ -511,6 +511,10 @@ var (
 		ID:    "AdminUnknownUser",
 		Other: "Unknown User",
 	}
+	AdminUserIDLabel = &i18n.Message{
+		ID:    "AdminUserIDLabel",
+		Other: "User {{.ID}}",
+	}
 	AdminProtectedUser = &i18n.Message{
 		ID:    "AdminProtectedUser",
 		Other: "Protected User",
