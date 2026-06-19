@@ -31,7 +31,6 @@ func URLHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 	if util.HasHashtagEntity(message, "skip") {
 		return ext.EndGroups
 	}
-	setProcessingReaction(bot, message)
 
 	extractorCtx := extractors.FromURL(url)
 	if extractorCtx == nil || extractorCtx.Extractor == nil {
@@ -49,6 +48,8 @@ func URLHandler(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return ext.EndGroups
 	}
 	extractorCtx.SetChat(chat)
+
+	setProcessingReaction(bot, message)
 
 	if extractorCtx.Extractor.ID == "youtube" {
 		if youtube.IsShortsURL(url) {
