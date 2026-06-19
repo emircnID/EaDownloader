@@ -409,7 +409,7 @@ func buildMutedUserList(localizer *localization.Localizer) (string, gotgbot.Inli
 		text += fmt.Sprintf(
 			"<b>%d.</b> %s\n<code>%d</code> · %s: %s\n%s: %s\n\n",
 			index+1,
-			formatMutedUserDisplayName(row),
+			formatMutedUserDisplayName(localizer, row),
 			row.UserID,
 			adminText(localizer, localization.StatusMutedRemaining),
 			formatDurationLeft(row.ExpiresAt.Time),
@@ -445,7 +445,7 @@ func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.Inl
 		text += fmt.Sprintf(
 			"<b>%d.</b> %s\n<code>%d</code> · %s\n%s: %s\n\n",
 			index+1,
-			formatBannedUserDisplayName(row),
+			formatBannedUserDisplayName(localizer, row),
 			row.UserID,
 			formatTimeAgo(localizer, row.CreatedAt),
 			adminText(localizer, localization.AdminReasonLabel),
@@ -1359,8 +1359,8 @@ func adminPaginationRows(localizer *localization.Localizer, screen string, page 
 	return [][]gotgbot.InlineKeyboardButton{row}
 }
 
-func formatBannedUserDisplayName(row database.ListBannedUsersRow) string {
-	name := bannedUserDisplayLabel(row)
+func formatBannedUserDisplayName(localizer *localization.Localizer, row database.ListBannedUsersRow) string {
+	name := bannedUserDisplayLabel(localizer, row)
 	return fmt.Sprintf(
 		"<a href='tg://user?id=%d'>%s</a>",
 		row.UserID,
@@ -1368,8 +1368,8 @@ func formatBannedUserDisplayName(row database.ListBannedUsersRow) string {
 	)
 }
 
-func formatMutedUserDisplayName(row database.ListActiveMutedUsersRow) string {
-	name := bannedUserDisplayLabel(database.ListBannedUsersRow{
+func formatMutedUserDisplayName(localizer *localization.Localizer, row database.ListActiveMutedUsersRow) string {
+	name := bannedUserDisplayLabel(localizer, database.ListBannedUsersRow{
 		UserID:    row.UserID,
 		Username:  row.Username,
 		FirstName: row.FirstName,
@@ -1464,13 +1464,13 @@ func getActiveMuteExpiresAt(userID int64) (time.Time, bool, error) {
 	return activeMute.ExpiresAt.Time, true, nil
 }
 
-func bannedUserDisplayLabel(row database.ListBannedUsersRow) string {
+func bannedUserDisplayLabel(localizer *localization.Localizer, row database.ListBannedUsersRow) string {
 	name := strings.TrimSpace(strings.Join([]string{row.FirstName, row.LastName}, " "))
 	if name == "" && strings.TrimSpace(row.Username) != "" {
 		name = "@" + strings.TrimSpace(row.Username)
 	}
 	if name == "" {
-		name = strconv.FormatInt(row.UserID, 10)
+		name = adminText(localizer, localization.AdminUnknownUser)
 	}
 	return name
 }

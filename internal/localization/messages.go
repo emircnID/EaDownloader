@@ -509,7 +509,7 @@ var (
 	}
 	AdminUnknownUser = &i18n.Message{
 		ID:    "AdminUnknownUser",
-		Other: "unknown",
+		Other: "Unknown User",
 	}
 	AdminProtectedUser = &i18n.Message{
 		ID:    "AdminProtectedUser",
