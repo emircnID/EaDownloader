@@ -132,7 +132,7 @@ func resolveAdminCallback(bot *gotgbot.Bot, ctx *ext.Context, localizer *localiz
 	case strings.HasPrefix(data, adminScreenGroups+":"):
 		return buildGroupList(localizer, strings.TrimPrefix(data, adminScreenGroups+":"))
 	case data == adminScreenBans:
-		return buildBannedUserList(localizer)
+		return buildBannedUserList(bot, localizer)
 	case data == adminScreenMutes:
 		return buildMutedUserList(localizer)
 	case data == adminScreenGroupBans:
@@ -421,7 +421,7 @@ func buildMutedUserList(localizer *localization.Localizer) (string, gotgbot.Inli
 	return strings.TrimSpace(text), mutedUserListKeyboard(localizer, rows), nil
 }
 
-func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.InlineKeyboardMarkup, error) {
+func buildBannedUserList(bot *gotgbot.Bot, localizer *localization.Localizer) (string, gotgbot.InlineKeyboardMarkup, error) {
 	total, err := database.Q().CountBannedChatsByType(context.Background(), database.ChatTypePrivate)
 	if err != nil {
 		return "", gotgbot.InlineKeyboardMarkup{}, err
@@ -430,6 +430,8 @@ func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.Inl
 	if err != nil {
 		return "", gotgbot.InlineKeyboardMarkup{}, err
 	}
+
+	rows, useResolvedNames := resolveBannedUserDisplays(bot, rows)
 
 	if len(rows) == 0 {
 		return "<b>⛔ " + adminText(localizer, localization.AdminBannedUsers) + "</b>\n\n" + adminText(localizer, localization.AdminNoBannedUsers), bannedUserListKeyboard(localizer, rows), nil
@@ -445,7 +447,7 @@ func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.Inl
 		text += fmt.Sprintf(
 			"<b>%d.</b> %s\n<code>%d</code> · %s\n%s: %s\n\n",
 			index+1,
-			formatBannedUserDisplayName(localizer, row),
+			formatBannedUserDisplayName(localizer, row, useResolvedNames),
 			row.UserID,
 			formatTimeAgo(localizer, row.CreatedAt),
 			adminText(localizer, localization.AdminReasonLabel),
@@ -454,6 +456,69 @@ func buildBannedUserList(localizer *localization.Localizer) (string, gotgbot.Inl
 	}
 
 	return strings.TrimSpace(text), bannedUserListKeyboard(localizer, rows), nil
+}
+
+func resolveBannedUserDisplays(
+	bot *gotgbot.Bot,
+	rows []database.ListBannedUsersRow,
+) ([]database.ListBannedUsersRow, bool) {
+	if bot == nil || len(rows) == 0 {
+		return rows, false
+	}
+
+	resolvedRows := make([]database.ListBannedUsersRow, len(rows))
+	copy(resolvedRows, rows)
+	fetchedRows := make([]database.ListBannedUsersRow, 0, len(rows))
+
+	for i, row := range resolvedRows {
+		if bannedUserHasDisplayName(row) {
+			continue
+		}
+
+		chat, err := bot.GetChat(row.UserID, nil)
+		if err != nil || chat == nil || chat.Type != gotgbot.ChatTypePrivate {
+			return rows, false
+		}
+
+		resolvedRows[i].Username = chat.Username
+		resolvedRows[i].FirstName = chat.FirstName
+		resolvedRows[i].LastName = chat.LastName
+		if !bannedUserHasDisplayName(resolvedRows[i]) {
+			return rows, false
+		}
+		fetchedRows = append(fetchedRows, resolvedRows[i])
+	}
+
+	for _, row := range fetchedRows {
+		storeResolvedBannedUser(row)
+	}
+
+	return resolvedRows, true
+}
+
+func storeResolvedBannedUser(row database.ListBannedUsersRow) {
+	_, _ = database.Q().GetOrCreateChat(
+		context.Background(),
+		database.GetOrCreateChatParams{
+			ChatID:          row.UserID,
+			Type:            database.ChatTypePrivate,
+			Username:        row.Username,
+			FirstName:       row.FirstName,
+			LastName:        row.LastName,
+			Language:        config.Env.DefaultLanguage,
+			Captions:        config.Env.DefaultCaptions,
+			Silent:          config.Env.DefaultSilent,
+			Nsfw:            config.Env.DefaultNSFW,
+			MediaAlbumLimit: config.Env.DefaultMediaAlbumLimit,
+			DeleteLinks:     config.Env.DefaultDeleteLinks,
+		},
+	)
+}
+
+func bannedUserHasDisplayName(row database.ListBannedUsersRow) bool {
+	return strings.TrimSpace(row.FirstName) != "" ||
+		strings.TrimSpace(row.LastName) != "" ||
+		strings.TrimSpace(row.Username) != ""
 }
 
 func buildUserProfile(localizer *localization.Localizer, value string) (string, gotgbot.InlineKeyboardMarkup, error) {
@@ -1359,8 +1424,12 @@ func adminPaginationRows(localizer *localization.Localizer, screen string, page 
 	return [][]gotgbot.InlineKeyboardButton{row}
 }
 
-func formatBannedUserDisplayName(localizer *localization.Localizer, row database.ListBannedUsersRow) string {
-	name := bannedUserDisplayLabel(localizer, row)
+func formatBannedUserDisplayName(
+	localizer *localization.Localizer,
+	row database.ListBannedUsersRow,
+	useResolvedName bool,
+) string {
+	name := bannedUserDisplayLabel(localizer, row, useResolvedName)
 	return fmt.Sprintf(
 		"<a href='tg://user?id=%d'>%s</a>",
 		row.UserID,
@@ -1369,12 +1438,7 @@ func formatBannedUserDisplayName(localizer *localization.Localizer, row database
 }
 
 func formatMutedUserDisplayName(localizer *localization.Localizer, row database.ListActiveMutedUsersRow) string {
-	name := bannedUserDisplayLabel(localizer, database.ListBannedUsersRow{
-		UserID:    row.UserID,
-		Username:  row.Username,
-		FirstName: row.FirstName,
-		LastName:  row.LastName,
-	})
+	name := adminUserDisplayLabel(row.UserID, row.Username, row.FirstName, row.LastName)
 	return fmt.Sprintf(
 		"<a href='tg://user?id=%d'>%s</a>",
 		row.UserID,
@@ -1464,12 +1528,30 @@ func getActiveMuteExpiresAt(userID int64) (time.Time, bool, error) {
 	return activeMute.ExpiresAt.Time, true, nil
 }
 
-func bannedUserDisplayLabel(localizer *localization.Localizer, row database.ListBannedUsersRow) string {
+func bannedUserDisplayLabel(
+	localizer *localization.Localizer,
+	row database.ListBannedUsersRow,
+	useResolvedName bool,
+) string {
+	if useResolvedName {
+		return adminUserDisplayLabel(row.UserID, row.Username, row.FirstName, row.LastName)
+	}
 	return adminTextTemplate(
 		localizer,
 		localization.AdminUserIDLabel,
 		map[string]string{"ID": strconv.FormatInt(row.UserID, 10)},
 	)
+}
+
+func adminUserDisplayLabel(userID int64, username string, firstName string, lastName string) string {
+	name := strings.TrimSpace(strings.Join([]string{firstName, lastName}, " "))
+	if name == "" && strings.TrimSpace(username) != "" {
+		name = "@" + strings.TrimSpace(username)
+	}
+	if name == "" {
+		name = strconv.FormatInt(userID, 10)
+	}
+	return name
 }
 
 func formatUsername(username string) string {
