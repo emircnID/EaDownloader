@@ -468,7 +468,6 @@ func resolveBannedUserDisplays(
 
 	resolvedRows := make([]database.ListBannedUsersRow, len(rows))
 	copy(resolvedRows, rows)
-	fetchedRows := make([]database.ListBannedUsersRow, 0, len(rows))
 
 	for i, row := range resolvedRows {
 		if bannedUserHasDisplayName(row) {
@@ -486,33 +485,9 @@ func resolveBannedUserDisplays(
 		if !bannedUserHasDisplayName(resolvedRows[i]) {
 			return rows, false
 		}
-		fetchedRows = append(fetchedRows, resolvedRows[i])
-	}
-
-	for _, row := range fetchedRows {
-		storeResolvedBannedUser(row)
 	}
 
 	return resolvedRows, true
-}
-
-func storeResolvedBannedUser(row database.ListBannedUsersRow) {
-	_, _ = database.Q().GetOrCreateChat(
-		context.Background(),
-		database.GetOrCreateChatParams{
-			ChatID:          row.UserID,
-			Type:            database.ChatTypePrivate,
-			Username:        row.Username,
-			FirstName:       row.FirstName,
-			LastName:        row.LastName,
-			Language:        config.Env.DefaultLanguage,
-			Captions:        config.Env.DefaultCaptions,
-			Silent:          config.Env.DefaultSilent,
-			Nsfw:            config.Env.DefaultNSFW,
-			MediaAlbumLimit: config.Env.DefaultMediaAlbumLimit,
-			DeleteLinks:     config.Env.DefaultDeleteLinks,
-		},
-	)
 }
 
 func bannedUserHasDisplayName(row database.ListBannedUsersRow) bool {
@@ -1430,11 +1405,7 @@ func formatBannedUserDisplayName(
 	useResolvedName bool,
 ) string {
 	name := bannedUserDisplayLabel(localizer, row, useResolvedName)
-	return fmt.Sprintf(
-		"<a href='tg://user?id=%d'>%s</a>",
-		row.UserID,
-		html.EscapeString(name),
-	)
+	return html.EscapeString(name)
 }
 
 func formatMutedUserDisplayName(localizer *localization.Localizer, row database.ListActiveMutedUsersRow) string {
